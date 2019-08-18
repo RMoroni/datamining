@@ -30,3 +30,22 @@ if __name__ == "__main__":
 
     #plota o gráfico
     plot(sample)
+
+    #conta quantos clusters X, Y e XY existem no dataset de treino
+    cluster_x = 0
+    cluster_y = 0
+    cluster_xy = 0
+    for item in dataset[0]['cluster']:
+        if item == 'X':
+            cluster_x += 1
+        elif item == 'Y':
+            cluster_y += 1
+        else:
+            cluster_xy += 1
+
+    print("Clusters\n",cluster_x,"são X\n",cluster_y,"são Y\n",cluster_xy,"são XY\n")
+
+    #imprime o menor valor da coluna silhouette
+    print("Silhouette\nMenor valor ->",dataset[0]['silhouette'].min())
+    #imprime o maior valor da coluna silhouette
+    print("Maior valor ->",dataset[0]['silhouette'].max())
