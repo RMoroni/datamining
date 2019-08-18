@@ -31,21 +31,32 @@ if __name__ == "__main__":
     #plota o gráfico
     plot(sample)
 
-    #conta quantos clusters X, Y e XY existem no dataset de treino
+    #conta quantos clusters X, Y e XY existem no dataset de treino (duas formas)
     cluster_x = 0
     cluster_y = 0
     cluster_xy = 0
-    for item in dataset[0]['cluster']:
+    cluster_l = 0
+
+    cluster_x = len(dataset[0][dataset[0]['cluster'] == 'X'])
+    cluster_y = len(dataset[0][dataset[0]['cluster'] == 'Y'])
+    cluster_xy = len(dataset[0][dataset[0]['cluster'] == 'XY'])
+    cluster_l = len(dataset[0][dataset[0]['cluster'] == 'L'])
+
+    '''for item in dataset[0]['cluster']:
         if item == 'X':
             cluster_x += 1
         elif item == 'Y':
             cluster_y += 1
-        else:
+        elif item == 'XY':
             cluster_xy += 1
+        else:
+            cluster_l += 1'''
 
-    print("Clusters\n",cluster_x,"são X\n",cluster_y,"são Y\n",cluster_xy,"são XY\n")
+    #imprime o resultados das contagens
+    print("Clusters\n",cluster_x,"são X\n",cluster_y,"são Y\n",cluster_xy,"são XY\n",cluster_l,"são L\n")
 
     #imprime o menor valor da coluna silhouette
     print("Silhouette\nMenor valor ->",dataset[0]['silhouette'].min())
+
     #imprime o maior valor da coluna silhouette
     print("Maior valor ->",dataset[0]['silhouette'].max())
