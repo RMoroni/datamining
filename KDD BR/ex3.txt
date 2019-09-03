@@ -1,0 +1,41 @@
+1.
+library(datasets)
+library(party)
+data(iris)
+library(caTools)
+set.seed(123)
+split <- sample.split(iris$Species, SplitRatio = 0.7)
+train = subset(iris, split == TRUE)
+test = subset(iris, split == FALSE)
+m <- ctree(Species ~ ., data = train)
+table(predict(m, test[,1:4]), test$Species)
+
+2.
+library(caret)
+data(iris)
+tc <- trainControl(method = "cv", number = 10)
+fit <- train(Species ~., data = iris, method = "rf", trControl = tc, metric = "Accuracy")
+pred <- predict(fit, iris[ ,-5])
+confusionMatrix(iris[ ,5], pred)
+
+# Apresentou uma pequena melhoria em relação ao resultado anterior.
+
+3.
+require(class)
+data(iris)
+set.seed(99)
+rnum<- sample(rep(1:150))
+iris<- iris[rnum,]
+normalize <- function(x){
+  return ((x-min(x))/(max(x)-min(x)))
+}
+
+iris.new<- as.data.frame(lapply(iris[,c(1,2,3,4)],normalize))
+iris.train<- iris.new[1:130,]
+iris.train.target<- iris[1:130,5]
+iris.test<- iris.new[131:150,]
+iris.test.target<- iris[131:150,5]
+model1<- knn(train=iris.train, test=iris.test, cl=iris.train.target, k=16)
+table(iris.test.target, model1)
+
+# O KNN apresentou um bom desempenho, semelhante à árvore de decisão. De uma maneira geral, o desempenho dos modelos foram semelhantes.
