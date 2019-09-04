@@ -1,0 +1,7 @@
+1. A agregação busca reduzir as dimensões através da união de vários atributos presentes nos dados, com isso, um 'novo' atributo é gerado com essa união.  O PCA reduz a dimensão dos dados, mas de forma que a projeção (de uma dimensão maior para uma menor) apresente a maior variação possível nos dados. Então, se os dados possuem três dimensões, este será reduzido para um plano que consiga representar uma variação maior.
+
+2. Algumas análises como regressão linear e densidade euclidiana. A agregação não parece interessante para esse caso, mas o PCA poderia ser utilizado para reduzir de duas (X e Y) para uma dimensão. A vizualização dos dados pode ser feita de várias formas, mas o interessante é encontrar os clusters, por isso, o scatter-plot acaba sendo uma boa opção. Outras técnicas, como box-plot e histograma também servem, mas com alguns ajustes. Por exemplo, pode ser aplicado um histograma sobre os scores para analisar quais pontuações são mais frequentes.
+
+3. Histograma, Box-plot, Scatter-plot (com cores de acordo com label).
+
+4. A visualização com scatter-plot contribui para enteder um pouco da separação dos clusters. O box-plot também é útil, analisando o X e o Y de forma separada. A redução com PCA não pareceu ter contribuido muito. Já o histograma dos scores serve para entender a tendência de acerto da clusterização automática.
