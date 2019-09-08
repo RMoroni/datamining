@@ -109,6 +109,18 @@ def frequency_clusters(dataset):
     plt.hist(dataset_baixo_score['cluster'])
     plt.show()
 
+def anomalia_clusters(dataset):
+    cluster_x = dataset[0][dataset[0]['cluster'] == 'X']
+    # cluster_y = dataset[0][dataset[0]['cluster'] == 'Y']
+    # cluster_xy = dataset[0][dataset[0]['cluster'] == 'XY']
+    # cluster_l = dataset[0][dataset[0]['cluster'] == 'L']
+
+    plt.boxplot(cluster_x['signalX'])
+    plt.show()
+
+    plt.boxplot(cluster_x['signalY'])
+    plt.show()
+
 if __name__ == "__main__":
     
     #define parte do csv que será carregada
