@@ -83,7 +83,32 @@ def show_plots(data):
         colors = ['red', 'green', 'blue', 'purple']
         plt.scatter(sample['signalX'], sample['signalY'], c=sample['cluster'], cmap=matplotlib.colors.ListedColormap(colors))
         plt.show()
- 
+
+def frequency_clusters(dataset):
+    #filtra amostras com mais alto e com mais baixo score
+    alto_score = dataset[2][dataset[2]['score'] >= 0.9]
+    baixo_score = dataset[2][dataset[2]['score'] <= 0.1]
+
+    #recupera os osbjetos de cada amostra filtrada anteriomente
+    frames_alto_score = []
+    for id_amostra in alto_score['scatterplotID']:
+        frames_alto_score.append(dataset[0][dataset[0]['scatterplotID'] == id_amostra])
+
+    frames_baixo_score = []
+    for id_amostra in baixo_score['scatterplotID']:
+        frames_baixo_score.append(dataset[0][dataset[0]['scatterplotID'] == id_amostra])
+
+    #concatena os frames recuperados
+    dataset_alto_score = pd.concat(frames_alto_score)
+    dataset_baixo_score = pd.concat(frames_baixo_score)
+
+    #plota o histograma para verificar se existem diferenças nas frequencias de clusters em cada caso
+    plt.hist(dataset_alto_score['cluster'])
+    plt.show()
+
+    plt.hist(dataset_baixo_score['cluster'])
+    plt.show()
+
 if __name__ == "__main__":
     
     #define parte do csv que será carregada
@@ -100,7 +125,10 @@ if __name__ == "__main__":
  
     #onde serão montados os gráficos
     show_plots(dataset)
- 
+
+    #mostra a frequencia dos clusters para amostras com alto score e baixo score
+    frequency_clusters(dataset)
+
     #quantos itens para cada amostra
     #print(dataset[0]['scatterplotID'].value_counts())
  
