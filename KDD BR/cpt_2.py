@@ -159,6 +159,9 @@ def linear_regression(dataset):
     r_sq = model.score(x, y)
     print(r_sq)
 
+    y_pred = model.predict(x[2:6])
+    print(y_pred)
+
 if __name__ == "__main__":
     
     #define parte do csv que será carregada
