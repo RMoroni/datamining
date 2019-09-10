@@ -69,6 +69,7 @@ def show_plots(data):
         #gráfico de X e Y com labels (seguindo as cores)
         plot_score = score[score['scatterplotID'] == id].score.values[0]
         silhouette = train[train['scatterplotID'] == id].silhouette
+        print(silhouette.mean())
         colors = ['red', 'green', 'blue', 'purple']
         plt.scatter(sample['signalX'], sample['signalY'], c=sample['cluster'], cmap=matplotlib.colors.ListedColormap(colors))
         plt.title('scatterplotID:' + str(id) + ' - Score:' + str(plot_score))
@@ -137,6 +138,27 @@ def anomalia_clusters(dataset):
     plt.title('Box Plot Cluster Y - signal Y (score < 0.1))')
     plt.show()
 
+def linear_regression(dataset):
+    train = dataset[0][0:]
+    score = dataset[2]
+
+    #retiro os marcados como L
+    train = train[train['cluster'] != 3]
+
+    x = []
+    y = []
+
+    #regressão linear da média da silhouette de cada plot com o score
+    for id, sample in train.groupby('scatterplotID'):
+        x.append(sample.silhouette.mean())
+        y.append(score[score['scatterplotID'] == id].score.values[0])
+
+    x = np.array(x).reshape((-1, 1))
+    y = np.array(y)
+    model = LinearRegression().fit(x, y)
+    r_sq = model.score(x, y)
+    print(r_sq)
+
 if __name__ == "__main__":
     
     #define parte do csv que será carregada
@@ -152,13 +174,16 @@ if __name__ == "__main__":
     dataset = data_treat(dataset)
  
     #onde serão montados os gráficos
-    show_plots(dataset)
+    #show_plots(dataset)
 
     #mostra a frequencia dos clusters para amostras com alto score e baixo score
-    frequency_clusters(dataset)
+    #frequency_clusters(dataset)
 
     #mostra anomalias
-    anomalia_clusters(dataset)
+    #anomalia_clusters(dataset)
+
+    #regressão linear
+    linear_regression(dataset)
 
     #quantos itens para cada amostra
     #print(dataset[0]['scatterplotID'].value_counts())
