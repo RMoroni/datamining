@@ -65,12 +65,18 @@ def show_plots(data):
     plt.show()
 
     #esse trecho ajuda a mostrar as diferenças entre cada amostra
-    for id, sample in train.groupby('scatterplotID'):        
-        #gráfico de X e Y com labels (seguindo as cores)
-        plot_score = score[score['scatterplotID'] == id].score.values[0]
-        silhouette = train[train['scatterplotID'] == id].silhouette
+    for id, sample in train.groupby('scatterplotID'):
+
+        #gráfico de X e Y com labels (seguindo as cores)        
         colors = ['red', 'green', 'blue', 'purple']
         plt.scatter(sample['signalX'], sample['signalY'], c=sample['cluster'], cmap=matplotlib.colors.ListedColormap(colors))
+
+        #pego a silhouette e o score do plot
+        plot_score = score[score['scatterplotID'] == id].score.values[0]
+        silhouette = train[train['scatterplotID'] == id].silhouette
+
+        #com isso é possivel analisar a relação entre a silhouette e o score
+        #(onde o score é mais baixo a silhouette se 'espalha' pelo histograma)
         plt.title('scatterplotID:' + str(id) + ' - Score:' + str(plot_score))
         plt.show()
         plt.hist(silhouette)
@@ -84,28 +90,14 @@ def frequency_clusters(dataset):
     #recupera os osbjetos de cada amostra filtrada anteriomente
     frames_alto_score = dataset[0][dataset[0]['scatterplotID'].isin(alto_score['scatterplotID'])]
     frames_baixo_score = dataset[0][dataset[0]['scatterplotID'].isin(baixo_score['scatterplotID'])]
-    
-    '''
-    frames_alto_score = []
-    for id_amostra in alto_score['scatterplotID']:
-        frames_alto_score.append(dataset[0][dataset[0]['scatterplotID'] == id_amostra])
-
-    frames_baixo_score = []
-    for id_amostra in baixo_score['scatterplotID']:
-        frames_baixo_score.append(dataset[0][dataset[0]['scatterplotID'] == id_amostra])
-    '''
-    
-    #concatena os frames recuperados
-   # dataset_alto_score = pd.concat(frames_alto_score)
-   # dataset_baixo_score = pd.concat(frames_baixo_score)
 
     #plota o histograma para verificar se existem diferenças nas frequencias de clusters em cada caso
     plt.hist(frames_alto_score['cluster'])
-    plt.title('Frequência por Cluster (score > 0.9)')
+    plt.title('Frequência por Cluster (score >= 0.9)')
     plt.show()
 
     plt.hist(frames_baixo_score['cluster'])
-    plt.title('Frequência por Cluster (score < 0.1)')
+    plt.title('Frequência por Cluster (score <= 0.1)')
     plt.show()
 
 def anomalia_clusters(dataset):
@@ -143,22 +135,22 @@ if __name__ == "__main__":
     #dessa forma é possível fazer o carregamento e processamento por partes
     skiprows = 0 #Pula nenhuma linha
     #skiprows = range(1,384) #Ou seja ignora as linhas de 1 a 385 (preciso da linha 0 p/ colunas)
-    nrows = 7680 #Quantas linhas serão carregadas
+    nrows = None #Quantas linhas serão carregadas
  
     #carrega o dataset
     dataset = load_dataset(skiprows, nrows)
  
     #trata o dataset
-    dataset = data_treat(dataset)
+    #dataset = data_treat(dataset)
  
     #onde serão montados os gráficos
-    show_plots(dataset)
+    #show_plots(dataset)
 
     #mostra a frequencia dos clusters para amostras com alto score e baixo score
     frequency_clusters(dataset)
 
     #mostra anomalias
-    anomalia_clusters(dataset)
+    #anomalia_clusters(dataset)
 
     #quantos itens para cada amostra
     #print(dataset[0]['scatterplotID'].value_counts())
