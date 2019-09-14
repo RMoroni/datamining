@@ -129,6 +129,41 @@ def anomalia_clusters(dataset):
     plt.title('Box Plot Cluster Y - signal Y (score < 0.1))')
     plt.show()
 
+def cria_feature_silhouette(dataset):
+    silhouette_amostra = []
+    for id_amostra in dataset[2]['scatterplotID']:
+        objetos = dataset[0][dataset[0]['scatterplotID'] == id_amostra]
+        objetos = objetos[objetos.silhouette != -2]
+        silhouette_amostra.append(objetos.loc[:, "silhouette"].mean())
+    dataset[2]['silhouette'] = silhouette_amostra
+
+def cria_feature_classificacao(dataset):
+    dataset[2].loc[dataset[2]['score'] <= 0.25, 'classificacao'] = 'pessimo'
+    dataset[2].loc[(dataset[2]['score'] > 0.25) & (dataset[2]['score'] <= 0.5), 'classificacao'] = 'ruim'
+    dataset[2].loc[(dataset[2]['score'] > 0.5) & (dataset[2]['score'] <= 0.75), 'classificacao'] = 'medio'
+    dataset[2].loc[dataset[2]['score'] > 0.75, 'classificacao'] = 'bom'
+
+def cria_feature_qntdadeXY(dataset):
+    XY_amostra = []
+    for id_amostra in dataset[2]['scatterplotID']:
+        objetos = dataset[0][dataset[0]['scatterplotID'] == id_amostra]
+        XY_amostra.append(len(objetos['cluster'] == 'XY'))
+    dataset[2]['XY'] = XY_amostra
+
+def analise_silhouette_score(dataset):
+    objetos = dataset[2][dataset[2]['classificacao'] == 'ruim']
+    objetos_ordenado = objetos.sort_values(['score'])
+    plt.plot(objetos_ordenado['score'], objetos_ordenado['silhouette'])
+    plt.title('Silhouette x Score')
+    plt.show()
+
+def analise_XY_score(dataset):
+    objetos = dataset[2][dataset[2]['classificacao'] == 'pessimo']
+    objetos_ordenado = objetos.sort_values(['score'])
+    plt.plot(objetos_ordenado['score'], objetos_ordenado['XY'])
+    plt.title('XY x Score')
+    plt.show()
+
 if __name__ == "__main__":
     
     #define parte do csv que será carregada
@@ -169,3 +204,13 @@ if __name__ == "__main__":
  
     #imprime o maior valor da coluna silhouette
     print("Maior valor ->",dataset[0]['silhouette'].max())'''
+
+    cria_feature_silhouette(dataset)
+
+    # cria_feature_qntdadeXY(dataset)
+
+    cria_feature_classificacao(dataset)
+
+    analise_silhouette_score(dataset)
+
+    # analise_XY_score(dataset)
