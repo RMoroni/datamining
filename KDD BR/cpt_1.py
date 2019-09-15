@@ -133,10 +133,15 @@ def cria_feature_silhouette(dataset):
     silhouette_amostra = []
     for id_amostra in dataset[2]['scatterplotID']:
         objetos = dataset[0][dataset[0]['scatterplotID'] == id_amostra]
+        # retira os valores de silhueta iguais a -2
         objetos = objetos[objetos.silhouette != -2]
+        # calcula a média das silhuetas dos objetos da amostra
         silhouette_amostra.append(objetos.loc[:, "silhouette"].mean())
-    dataset[2]['silhouette'] = silhouette_amostra
 
+    #insere a nova feature no dataframe
+    dataset[2]['silhouette'] = silhouette_amostra #
+
+#classifica as amostras de acordo com o score
 def cria_feature_classificacao(dataset):
     dataset[2].loc[dataset[2]['score'] <= 0.25, 'classificacao'] = 'pessimo'
     dataset[2].loc[(dataset[2]['score'] > 0.25) & (dataset[2]['score'] <= 0.5), 'classificacao'] = 'ruim'
@@ -147,19 +152,30 @@ def cria_feature_qntdadeXY(dataset):
     XY_amostra = []
     for id_amostra in dataset[2]['scatterplotID']:
         objetos = dataset[0][dataset[0]['scatterplotID'] == id_amostra]
+        #conta os clusters XY presentes na amostra
         XY_amostra.append(len(objetos['cluster'] == 'XY'))
+
+    # insere a nova feature no dataframe
     dataset[2]['XY'] = XY_amostra
 
 def analise_silhouette_score(dataset):
+    #filtra as amostras com determinada classificação (bom, medio, ruim, pessimo)
     objetos = dataset[2][dataset[2]['classificacao'] == 'ruim']
+    #ordena as amostras pelo score
     objetos_ordenado = objetos.sort_values(['score'])
+
+    #plota um gráfico de linha
     plt.plot(objetos_ordenado['score'], objetos_ordenado['silhouette'])
     plt.title('Silhouette x Score')
     plt.show()
 
 def analise_XY_score(dataset):
+    # filtra as amostras com determinada classificação (bom, medio, ruim, pessimo)
     objetos = dataset[2][dataset[2]['classificacao'] == 'pessimo']
+    # ordena as amostras pelo score
     objetos_ordenado = objetos.sort_values(['score'])
+
+    # plota um gráfico de linha
     plt.plot(objetos_ordenado['score'], objetos_ordenado['XY'])
     plt.title('XY x Score')
     plt.show()
@@ -189,28 +205,18 @@ if __name__ == "__main__":
 
     #quantos itens para cada amostra
     #print(dataset[0]['scatterplotID'].value_counts())
- 
-    #clusters X, Y e XY no dataset de treino
-    '''cluster_x = dataset[0][dataset[0]['cluster'] == 'X']
-    cluster_y = dataset[0][dataset[0]['cluster'] == 'Y']
-    cluster_xy = dataset[0][dataset[0]['cluster'] == 'XY']
-    cluster_l = dataset[0][dataset[0]['cluster'] == 'L']
- 
-    #imprime o resultados das contagens
-    print("Clusters\n",len(cluster_x),"são X\n",len(cluster_y),"são Y\n",len(cluster_xy),"são XY\n",len(cluster_l),"são L\n")
- 
-    #imprime o menor valor da coluna silhouette
-    print("Silhouette\nMenor valor ->",dataset[0]['silhouette'].min())
- 
-    #imprime o maior valor da coluna silhouette
-    print("Maior valor ->",dataset[0]['silhouette'].max())'''
 
-    cria_feature_silhouette(dataset)
+    #cria a feature silhueta para a amostra
+    #cria_feature_silhouette(dataset)
 
+    #cria a feature quantidade de cluster XY para a amostra
     # cria_feature_qntdadeXY(dataset)
 
-    cria_feature_classificacao(dataset)
+    #cria a feature que classifica as amostras de acordo com o score
+    #cria_feature_classificacao(dataset)
 
-    analise_silhouette_score(dataset)
+    #faz análise entre a silhueta e o score da amostra
+    #analise_silhouette_score(dataset)
 
+    #faz análise entre a quantidade de cluster XY e o score da amostra
     # analise_XY_score(dataset)
