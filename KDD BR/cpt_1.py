@@ -37,13 +37,13 @@ def pca(data):
     x = StandardScaler().fit_transform(x)
  
     #PCA ocorre aqui
-    pca = PCA(n_components=1)
+    pca = PCA(n_components=2)
     principalComponents = pca.fit_transform(x)
-    df = pd.DataFrame(data = principalComponents, columns = ['pca1'])
+    df = pd.DataFrame(data = principalComponents, columns = ['pca1', 'pca2'])
  
     colors = ['red', 'green', 'blue', 'purple']
-    #plt.scatter(df['pca1'], df['pca2'], c=data['cluster'], cmap=matplotlib.colors.ListedColormap(colors))
-    plt.plot(df, 'o', color='black')
+    plt.scatter(df['pca1'], df['pca2'], c=data['cluster'], cmap=matplotlib.colors.ListedColormap(colors))
+    #plt.plot(df, 'o', color='black')
     plt.show()
 
 def show_plots(data):
@@ -186,19 +186,19 @@ if __name__ == "__main__":
     #dessa forma é possível fazer o carregamento e processamento por partes
     skiprows = 0 #Pula nenhuma linha
     #skiprows = range(1,384) #Ou seja ignora as linhas de 1 a 385 (preciso da linha 0 p/ colunas)
-    nrows = None #Quantas linhas serão carregadas
+    nrows = 8000 #Quantas linhas serão carregadas
  
     #carrega o dataset
     dataset = load_dataset(skiprows, nrows)
  
     #trata o dataset
-    #dataset = data_treat(dataset)
- 
+    dataset = data_treat(dataset)
+    pca(dataset[0])
     #onde serão montados os gráficos
     #show_plots(dataset)
 
     #mostra a frequencia dos clusters para amostras com alto score e baixo score
-    frequency_clusters(dataset)
+    #frequency_clusters(dataset)
 
     #mostra anomalias
     #anomalia_clusters(dataset)

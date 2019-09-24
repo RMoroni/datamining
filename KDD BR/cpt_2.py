@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
+import math
 import matplotlib
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
+from sklearn.cluster import KMeans
  
 #dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
 dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
@@ -31,20 +33,6 @@ def data_treat(dataset):
     dataset[0] = data_map(dataset[0])
     dataset[1] = data_map(dataset[1])
     return dataset
- 
-def pca(data):
-    x = data[['signalX', 'signalY']]
-    x = StandardScaler().fit_transform(x)
- 
-    #PCA ocorre aqui
-    pca = PCA(n_components=1)
-    principalComponents = pca.fit_transform(x)
-    df = pd.DataFrame(data = principalComponents, columns = ['pca1'])
- 
-    colors = ['red', 'green', 'blue', 'purple']
-    #plt.scatter(df['pca1'], df['pca2'], c=data['cluster'], cmap=matplotlib.colors.ListedColormap(colors))
-    plt.plot(df, 'o', color='black')
-    plt.show()
 
 def show_plots(data):
     train = data[0][0:3840] #seleciona uma parte pra não ficar muito tempo no for...
@@ -109,35 +97,6 @@ def frequency_clusters(dataset):
     plt.title('Frequência por Cluster (score < 0.1)')
     plt.show()
 
-def anomalia_clusters(dataset):
-    #seleciona os clusters
-    cluster_x = dataset[0][dataset[0]['cluster'] == 0]
-    cluster_y = dataset[0][dataset[0]['cluster'] == 1]
-
-    #poderia aproveitar da função anterior, mas só pra ñ misturar...
-    #alto_score = dataset[2][dataset[2]['score'] >= 0.9]
-    baixo_score = dataset[2][dataset[2]['score'] <= 0.1]
-    
-    #seleciona apenas com baixo score (para cada cluster)
-    cluster_x = cluster_x[cluster_x['scatterplotID'].isin(baixo_score['scatterplotID'])]
-    cluster_y = cluster_y[cluster_y['scatterplotID'].isin(baixo_score['scatterplotID'])]
-
-    plt.boxplot(cluster_x['signalX'])
-    plt.title('Box Plot Cluster X - signal X (score < 0.1))')
-    plt.show()
-
-    plt.boxplot(cluster_x['signalY'])
-    plt.title('Box Plot Cluster X - signal Y (score < 0.1))')
-    plt.show()
-
-    plt.boxplot(cluster_y['signalX'])
-    plt.title('Box Plot Cluster Y - signal X (score < 0.1))')
-    plt.show()
-
-    plt.boxplot(cluster_y['signalY'])
-    plt.title('Box Plot Cluster Y - signal Y (score < 0.1))')
-    plt.show()
-
 def linear_regression(dataset):
     train = dataset[0][0:]
     score = dataset[2]
@@ -148,13 +107,20 @@ def linear_regression(dataset):
     x = []
     y = []
 
+    ids = []
+    feat = 0.0
+
     #regressão linear da média da silhouette de cada plot com o score
     for id, sample in train.groupby('scatterplotID'):
-        x.append(sample.silhouette.mean())
+        feat = sample.silhouette.mean()*0.6
+        feat = feat - sample.silhouette.std()*0.4
+        x.append(feat)
         y.append(score[score['scatterplotID'] == id].score.values[0])
+        ids.append(id)
 
     x = np.array(x).reshape((-1, 1))
     y = np.array(y)
+
     model = LinearRegression().fit(x, y)
     r_sq = model.score(x, y)
     print(r_sq)
@@ -162,13 +128,113 @@ def linear_regression(dataset):
     y_pred = model.predict(x[2:6])
     print(y_pred)
 
+def linear_regression_plot(dataset):
+    train = dataset[0][0:]
+    score = dataset[2]
+
+    #retiro os marcados como L
+    train = train[train['cluster'] != 3]
+    #train = train[train['scatterplotID'] == 33285]
+    x = []
+    y = []
+
+    #regressão linear da média da silhouette de cada plot com o score
+    for id, sample in train.groupby('scatterplotID'):
+        x.append(sample.silhouette.mean())
+        y.append(score[score['scatterplotID'] == id].score.values[0])
+
+    plt.scatter(x, y)
+    plt.show()
+
+def pca(dataset):
+    train = dataset[0]
+    x = train[['signalX', 'signalY']]
+    x = StandardScaler().fit_transform(x)
+ 
+    #PCA ocorre aqui
+    pca = PCA(n_components=2)
+    principalComponents = pca.fit_transform(x)
+    df = pd.DataFrame(data = principalComponents, columns = ['pca1', 'pca2'])
+ 
+    colors = ['red', 'green', 'blue', 'purple']
+    plt.scatter(df['pca1'], df['pca2'], c=train['cluster'], cmap=matplotlib.colors.ListedColormap(colors))
+    plt.show()
+
+def silhouette_statistic(dataset):
+    train = dataset[0][0:]
+    score = dataset[2]
+
+    train = train[train['cluster'] != 3]
+    
+    mean = []
+    median = []
+    #mode = []
+    amp = []
+    std = []
+    scr = []
+
+    for id, sample in train.groupby('scatterplotID'):
+        mean.append(sample.silhouette.mean())
+        median.append(sample.silhouette.median())
+        #mode.append(sample.silhouette.mode())
+        amp.append(sample.silhouette.max() - sample.silhouette.min())
+        std.append(sample.silhouette.std())
+        scr.append(score[score['scatterplotID'] == id].score.values[0])
+
+    dict = {'score':scr, 'mean':mean, 'median':median, 'amp':amp, 'std':std}
+
+    df = pd.DataFrame(dict)
+    df.to_csv(dataset_path + 'silhouette_statistic.csv')
+
+def correlation(dataset):
+    pass
+
+def k_means(dataset):
+    train = dataset[0][0:]
+    X = []
+    kmeans = KMeans(n_clusters=2)
+    for _, sample in train.groupby('scatterplotID'):
+        x=[]
+        x.append(sample.silhouette.mean())
+        x.append(sample.silhouette.std())
+        X.append(x)
+
+    X = np.array(X)
+    y_kmeans = kmeans.fit_predict(X)
+    plt.scatter(X[:,0], X[:,1], c=y_kmeans, cmap='viridis')
+    plt.show()
+    
+    wcss = []
+    for n in range(2, 8):
+        kmeans = KMeans(n_clusters=n)
+        kmeans.fit_predict(X)
+        wcss.append(kmeans.inertia_)
+
+    plt.scatter(wcss, range(2,8))
+    plt.show()
+
+    x1, y1 = 2, wcss[0]
+    x2, y2 = 8, wcss[len(wcss)-1]
+    distances = []
+    for i in range(len(wcss)):
+        x0 = i+2
+        y0 = wcss[i]
+        numerator = abs((y2-y1)*x0 - (x2-x1)*y0 + x2*y1 - y2*x1)
+        denominator = math.sqrt((y2 - y1)**2 + (x2 - x1)**2)
+        distances.append(numerator/denominator)
+    print(distances.index(max(distances)) + 2)
+    #plt.plot(distances)
+    #plt.show()
+
+
+
 if __name__ == "__main__":
     
     #define parte do csv que será carregada
     #dessa forma é possível fazer o carregamento e processamento por partes
     skiprows = 0 #Pula nenhuma linha
     #skiprows = range(1,384) #Ou seja ignora as linhas de 1 a 385 (preciso da linha 0 p/ colunas)
-    nrows = 7680 #Quantas linhas serão carregadas
+    nrows = 30000 #Quantas linhas serão carregadas
  
     #carrega o dataset
     dataset = load_dataset(skiprows, nrows)
@@ -185,23 +251,17 @@ if __name__ == "__main__":
     #mostra anomalias
     #anomalia_clusters(dataset)
 
-    #regressão linear
-    linear_regression(dataset)
+    #montei essa função pra tentar deixar 'linear' antes de passar para regressão
+    #linear_regression_plot(dataset)
 
-    #quantos itens para cada amostra
-    #print(dataset[0]['scatterplotID'].value_counts())
- 
-    #clusters X, Y e XY no dataset de treino
-    '''cluster_x = dataset[0][dataset[0]['cluster'] == 'X']
-    cluster_y = dataset[0][dataset[0]['cluster'] == 'Y']
-    cluster_xy = dataset[0][dataset[0]['cluster'] == 'XY']
-    cluster_l = dataset[0][dataset[0]['cluster'] == 'L']
- 
-    #imprime o resultados das contagens
-    print("Clusters\n",len(cluster_x),"são X\n",len(cluster_y),"são Y\n",len(cluster_xy),"são XY\n",len(cluster_l),"são L\n")
- 
-    #imprime o menor valor da coluna silhouette
-    print("Silhouette\nMenor valor ->",dataset[0]['silhouette'].min())
- 
-    #imprime o maior valor da coluna silhouette
-    print("Maior valor ->",dataset[0]['silhouette'].max())'''
+    #pca -> mantem o mesmo número de dimensões, mas 'ajusta' de forma que o padrão entre os samples fiquem 'iguais'
+    #apesar de não fazer sentido na questão do pca (por manter as mesmas dimensões), o 'ajuste' mostra que os samples são muito parecidos
+    #pca(dataset)
+
+    #regressão linear
+    #linear_regression(dataset)
+
+    #
+    #silhouette_statistic(dataset)
+
+    k_means(dataset)
