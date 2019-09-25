@@ -37,7 +37,7 @@ def data_treat(dataset):
 def k_means(dataset):
     train = dataset[0][0:]
     X = []
-    kmeans = KMeans(n_clusters=2) #dois clusters (inicial)
+    kmeans = KMeans(n_clusters=4) #dois clusters (inicial)
     for _, sample in train.groupby('scatterplotID'):
         x=[]
         #duas features, média e desvio padrão

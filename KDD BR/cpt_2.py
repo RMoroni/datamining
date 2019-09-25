@@ -8,8 +8,8 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
  
-#dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
-dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
+dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
+#dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
 #dataset_path = 'C:'
 
 def load_dataset(skiprows, nrows):
@@ -104,27 +104,28 @@ def linear_regression(dataset):
     #retiro os marcados como L
     train = train[train['cluster'] != 3]
 
+    #no X será a feature que tem correlação com score e no Y o score
     x = []
     y = []
 
-    ids = []
     feat = 0.0
 
     #regressão linear da média da silhouette de cada plot com o score
     for id, sample in train.groupby('scatterplotID'):
-        feat = sample.silhouette.mean()*0.6
-        feat = feat - sample.silhouette.std()*0.4
-        x.append(feat)
-        y.append(score[score['scatterplotID'] == id].score.values[0])
-        ids.append(id)
+        feat = sample.silhouette.mean()*0.1
+        feat = feat - sample.silhouette.std()
+        x.append(feat) #feature
+        y.append(score[score['scatterplotID'] == id].score.values[0]) #score do scatterplot
+        feat = 0.0
 
-    x = np.array(x).reshape((-1, 1))
+    x = np.array(x).reshape((-1, 1)) #tem que fazer isso aqui, sei lá pq
     y = np.array(y)
 
-    model = LinearRegression().fit(x, y)
-    r_sq = model.score(x, y)
+    model = LinearRegression().fit(x, y) #gera o modelo de regressão linear
+    r_sq = model.score(x, y) #calcular a taxa de correlação (printada depois)
     print(r_sq)
 
+    #predição de 4 scatterplot (apenas exemplo, mas é isso que vai para o submission)
     y_pred = model.predict(x[2:6])
     print(y_pred)
 
@@ -134,15 +135,21 @@ def linear_regression_plot(dataset):
 
     #retiro os marcados como L
     train = train[train['cluster'] != 3]
+
     #train = train[train['scatterplotID'] == 33285]
     x = []
     y = []
 
+    feat = 1.0
     #regressão linear da média da silhouette de cada plot com o score
     for id, sample in train.groupby('scatterplotID'):
-        x.append(sample.silhouette.mean())
+       #x.append(sample.silhouette.mean())
+        feat = feat - (abs(sample.silhouette.mean()-sample.silhouette.median()) + sample.silhouette.std())
+        x.append(feat)
         y.append(score[score['scatterplotID'] == id].score.values[0])
+        feat = 1.0
 
+    #basicamente, se a feat estiver 'boa', os dados poderão ser aproximados por uma reta
     plt.scatter(x, y)
     plt.show()
 
@@ -164,24 +171,21 @@ def silhouette_statistic(dataset):
     train = dataset[0][0:]
     score = dataset[2]
 
+    #retira com label L
     train = train[train['cluster'] != 3]
     
     mean = []
     median = []
-    #mode = []
-    amp = []
     std = []
     scr = []
 
     for id, sample in train.groupby('scatterplotID'):
         mean.append(sample.silhouette.mean())
         median.append(sample.silhouette.median())
-        #mode.append(sample.silhouette.mode())
-        amp.append(sample.silhouette.max() - sample.silhouette.min())
         std.append(sample.silhouette.std())
         scr.append(score[score['scatterplotID'] == id].score.values[0])
 
-    dict = {'score':scr, 'mean':mean, 'median':median, 'amp':amp, 'std':std}
+    dict = {'score':scr, 'mean':mean, 'median':median, 'std':std}
 
     df = pd.DataFrame(dict)
     df.to_csv(dataset_path + 'silhouette_statistic.csv')
@@ -234,7 +238,7 @@ if __name__ == "__main__":
     #dessa forma é possível fazer o carregamento e processamento por partes
     skiprows = 0 #Pula nenhuma linha
     #skiprows = range(1,384) #Ou seja ignora as linhas de 1 a 385 (preciso da linha 0 p/ colunas)
-    nrows = 30000 #Quantas linhas serão carregadas
+    nrows = None #Quantas linhas serão carregadas
  
     #carrega o dataset
     dataset = load_dataset(skiprows, nrows)
@@ -252,7 +256,7 @@ if __name__ == "__main__":
     #anomalia_clusters(dataset)
 
     #montei essa função pra tentar deixar 'linear' antes de passar para regressão
-    #linear_regression_plot(dataset)
+    linear_regression_plot(dataset)
 
     #pca -> mantem o mesmo número de dimensões, mas 'ajusta' de forma que o padrão entre os samples fiquem 'iguais'
     #apesar de não fazer sentido na questão do pca (por manter as mesmas dimensões), o 'ajuste' mostra que os samples são muito parecidos
@@ -264,4 +268,4 @@ if __name__ == "__main__":
     #
     #silhouette_statistic(dataset)
 
-    k_means(dataset)
+    #k_means(dataset)
