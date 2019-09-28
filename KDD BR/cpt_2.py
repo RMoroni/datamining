@@ -177,25 +177,76 @@ def silhouette_statistic(dataset):
     mean = []
     median = []
     std = []
+    qt1 = []
+    qt3 = []
     scr = []
 
     for id, sample in train.groupby('scatterplotID'):
         mean.append(sample.silhouette.mean())
         median.append(sample.silhouette.median())
         std.append(sample.silhouette.std())
+        qt1.append(sample.silhouette.quantile(q=0.25))
+        qt3.append(sample.silhouette.quantile(q=0.75))
         scr.append(score[score['scatterplotID'] == id].score.values[0])
 
-    dict = {'score':scr, 'mean':mean, 'median':median, 'std':std}
+    dict = {'score':scr, 'mean':mean, 'median':median, 'quartil 1':qt1, 'quartil 3':qt3, 'std':std}
 
     df = pd.DataFrame(dict)
     df.to_csv(dataset_path + 'silhouette_statistic.csv')
 
 def correlation(dataset):
-    pass
+    train = dataset[0][0:]
+    score = dataset[2]
+
+    #retira com label L
+    train = train[train['cluster'] != 3]
+
+    #adiciona o score para ficar no mesmo DF
+    train['score'] = score['score']
+    #caso outra feat seja adiciona, é só repetir o processo acima
+
+    #retiro duas colunas (axis=1 -> remove coluna inteira)
+    train.drop(['datapointID', 'sampletype'], axis=1)
+
+    #imprime a correlação entre os dados no DF: -1 (anti-correlação) a 1 (correlação perfeita)
+    print(train.corr())
 
 def k_means(dataset):
     train = dataset[0][0:]
+    train = train[train['cluster'] != 3]
+    
     X = []
+
+    #para exemplo: escolho apenas um scatter plot
+    train = train[train['scatterplotID'] == 10136]
+
+    cluster_x = train[train['cluster'] == 0]
+    cluster_y = train[train['cluster'] == 1]
+    cluster_xy = train[train['cluster'] == 2]    
+
+    #centroides inicias (fiz analisando o plot, talvez buscar o ponto de menor silhueta?)
+    #init = np.array([[200, 3000], [1660, 1960], [2700, 220]])
+    #utilizando a mediana eu chego no mesmo resultado anterior (o centro do cluster)
+    init = np.array([
+        [cluster_x.signalX.median(), cluster_x.signalY.median()], 
+        [cluster_y.signalX.median(), cluster_y.signalY.median()], 
+        [cluster_xy.signalX.median(), cluster_xy.signalY.median()]
+        ])
+    
+    #como nem todos scatter tem todas classes, n_clusters será o max + 1 (essa conta tá errada na vdd)
+    #como o centroide já está no lugar 'certo', n_init=1, pra não tentar alterar posição do centroide
+    kmeans = KMeans(n_clusters=train.cluster.max() + 1, init=init, n_jobs=-1, n_init=1)
+
+    #percorre todas linhas do scatter e adiciona no vetor
+    for _, row in train.iterrows():        
+        X.append([row['signalX'], row['signalY']])
+
+    #aquele padrãozinho
+    X = np.array(X)
+    y_kmeans = kmeans.fit_predict(X)
+    plt.scatter(X[:,0], X[:,1], c=y_kmeans, cmap='viridis')
+    plt.show()
+    '''X = []
     kmeans = KMeans(n_clusters=2)
     for _, sample in train.groupby('scatterplotID'):
         x=[]
@@ -228,7 +279,7 @@ def k_means(dataset):
         distances.append(numerator/denominator)
     print(distances.index(max(distances)) + 2)
     #plt.plot(distances)
-    #plt.show()
+    #plt.show()'''
 
 
 
@@ -256,7 +307,7 @@ if __name__ == "__main__":
     #anomalia_clusters(dataset)
 
     #montei essa função pra tentar deixar 'linear' antes de passar para regressão
-    linear_regression_plot(dataset)
+    #linear_regression_plot(dataset)
 
     #pca -> mantem o mesmo número de dimensões, mas 'ajusta' de forma que o padrão entre os samples fiquem 'iguais'
     #apesar de não fazer sentido na questão do pca (por manter as mesmas dimensões), o 'ajuste' mostra que os samples são muito parecidos
@@ -265,7 +316,10 @@ if __name__ == "__main__":
     #regressão linear
     #linear_regression(dataset)
 
+    #correlação
+    #correlation(dataset)
+    
     #
     #silhouette_statistic(dataset)
 
-    #k_means(dataset)
+    k_means(dataset)
