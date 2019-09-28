@@ -212,76 +212,48 @@ def correlation(dataset):
     print(train.corr())
 
 def k_means(dataset):
-    train = dataset[0][0:]
+    train = dataset[0][0:3840]
     train = train[train['cluster'] != 3]
     
     X = []
-
-    #para exemplo: escolho apenas um scatter plot
-    train = train[train['scatterplotID'] == 10136]
-
-    cluster_x = train[train['cluster'] == 0]
-    cluster_y = train[train['cluster'] == 1]
-    cluster_xy = train[train['cluster'] == 2]    
-
-    #centroides inicias (fiz analisando o plot, talvez buscar o ponto de menor silhueta?)
-    #init = np.array([[200, 3000], [1660, 1960], [2700, 220]])
-    #utilizando a mediana eu chego no mesmo resultado anterior (o centro do cluster)
-    init = np.array([
-        [cluster_x.signalX.median(), cluster_x.signalY.median()], 
-        [cluster_y.signalX.median(), cluster_y.signalY.median()], 
-        [cluster_xy.signalX.median(), cluster_xy.signalY.median()]
-        ])
-    
-    #como nem todos scatter tem todas classes, n_clusters será o max + 1 (essa conta tá errada na vdd)
-    #como o centroide já está no lugar 'certo', n_init=1, pra não tentar alterar posição do centroide
-    kmeans = KMeans(n_clusters=train.cluster.max() + 1, init=init, n_jobs=-1, n_init=1)
-
-    #percorre todas linhas do scatter e adiciona no vetor
-    for _, row in train.iterrows():        
-        X.append([row['signalX'], row['signalY']])
-
-    #aquele padrãozinho
-    X = np.array(X)
-    y_kmeans = kmeans.fit_predict(X)
-    plt.scatter(X[:,0], X[:,1], c=y_kmeans, cmap='viridis')
-    plt.show()
-    '''X = []
-    kmeans = KMeans(n_clusters=2)
+    n_clusters = 0
     for _, sample in train.groupby('scatterplotID'):
-        x=[]
-        x.append(sample.silhouette.mean())
-        x.append(sample.silhouette.std())
-        X.append(x)
+        cluster_x = sample[sample['cluster'] == 0]
+        cluster_y = sample[sample['cluster'] == 1]
+        cluster_xy = sample[sample['cluster'] == 2]    
 
-    X = np.array(X)
-    y_kmeans = kmeans.fit_predict(X)
-    plt.scatter(X[:,0], X[:,1], c=y_kmeans, cmap='viridis')
-    plt.show()
+        init = [] #centroide
+                
+        if len(cluster_x) > 0:
+            n_clusters = n_clusters + 1
+            init.append([cluster_x.signalX.median(), cluster_x.signalY.median()])
+        if len(cluster_y) > 0:
+            n_clusters = n_clusters + 1            
+            init.append([cluster_y.signalX.median(), cluster_y.signalY.median()])
+        if len(cluster_xy) > 0:
+            n_clusters = n_clusters + 1            
+            init.append([cluster_xy.signalX.median(), cluster_xy.signalY.median()])        
     
-    wcss = []
-    for n in range(2, 8):
-        kmeans = KMeans(n_clusters=n)
-        kmeans.fit_predict(X)
-        wcss.append(kmeans.inertia_)
+        init = np.array(init)
 
-    plt.scatter(wcss, range(2,8))
-    plt.show()
+        print (init)
+        print (n_clusters)
 
-    x1, y1 = 2, wcss[0]
-    x2, y2 = 8, wcss[len(wcss)-1]
-    distances = []
-    for i in range(len(wcss)):
-        x0 = i+2
-        y0 = wcss[i]
-        numerator = abs((y2-y1)*x0 - (x2-x1)*y0 + x2*y1 - y2*x1)
-        denominator = math.sqrt((y2 - y1)**2 + (x2 - x1)**2)
-        distances.append(numerator/denominator)
-    print(distances.index(max(distances)) + 2)
-    #plt.plot(distances)
-    #plt.show()'''
+        #como nem todos scatter tem todas classes, n_clusters será o max + 1 (essa conta tá errada na vdd)
+        #como o centroide já está no lugar 'certo', n_init=1, pra não tentar alterar posição do centroide
+        kmeans = KMeans(n_clusters=n_clusters, init=init, n_jobs=-1, n_init=1, max_iter=300)
 
+        #percorre todas linhas do scatter e adiciona no vetor
+        for _, row in sample.iterrows():        
+            X.append([row['signalX'], row['signalY']])
 
+        #aquele padrãozinho
+        X = np.array(X)
+        y_kmeans = kmeans.fit_predict(X)
+        plt.scatter(X[:,0], X[:,1], c=y_kmeans, cmap='viridis')
+        plt.show()
+        X = [] #zera vetor
+        n_clusters = 0 #zera clusters
 
 if __name__ == "__main__":
     
