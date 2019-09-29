@@ -8,8 +8,8 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
  
-dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
-#dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
+#dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
+dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
 #dataset_path = 'C:'
 
 def load_dataset(skiprows, nrows):
@@ -212,18 +212,32 @@ def correlation(dataset):
     print(train.corr())
 
 def k_means(dataset):
+    '''
+    Algumas possibilidades:
+        * esquecer que isso existiu
+        * tentar melhorar isso aqui e usar como previsor
+        * (também) utilizar o vetor acurr para formar o x na regressão linear
+    '''
     train = dataset[0][0:3840]
+    score = dataset[2]
     train = train[train['cluster'] != 3]
     
+    acurr = [] #vou salvar aqui a 'taxa' de acerto pra utilizar depois como probabilidade de 'erro'
+    #pra criar um 'score individual' é preciso colocar mais uma coluna no train['score_indi'] = val
+    #e adicionar se acertou e errou, depois alterar para considerar outros aspectos...
     X = []
     n_clusters = 0
-    for _, sample in train.groupby('scatterplotID'):
+    for id, sample in train.groupby('scatterplotID'):
+
+        #separa os clusters para descobrir o centro de cada um
         cluster_x = sample[sample['cluster'] == 0]
         cluster_y = sample[sample['cluster'] == 1]
         cluster_xy = sample[sample['cluster'] == 2]    
 
         init = [] #centroide
                 
+        #para descobrir quantos clusters será utilizado no kmeans
+        #certeza tem jeito mais simples de fazer isso, mas funcionou então ok...
         if len(cluster_x) > 0:
             n_clusters = n_clusters + 1
             init.append([cluster_x.signalX.median(), cluster_x.signalY.median()])
@@ -236,9 +250,6 @@ def k_means(dataset):
     
         init = np.array(init)
 
-        print (init)
-        print (n_clusters)
-
         #como nem todos scatter tem todas classes, n_clusters será o max + 1 (essa conta tá errada na vdd)
         #como o centroide já está no lugar 'certo', n_init=1, pra não tentar alterar posição do centroide
         kmeans = KMeans(n_clusters=n_clusters, init=init, n_jobs=-1, n_init=1, max_iter=300)
@@ -247,13 +258,33 @@ def k_means(dataset):
         for _, row in sample.iterrows():        
             X.append([row['signalX'], row['signalY']])
 
+        #salvo o score do plot
+        plot_score = score[score['scatterplotID'] == id].score.values[0]
+        
+        #plt.title(f"Score: {plot_score}") #se for python 3.6 ou superior, pode rodar dessa forma
+        plt.title('Score:' + str(plot_score))
+        
         #aquele padrãozinho
         X = np.array(X)
         y_kmeans = kmeans.fit_predict(X)
+        
+        #comparar a rotulagem do kmeans com original
+        count = 0
+        hit = 0
+        for _, row in sample.iterrows():
+            if row['cluster'] == y_kmeans[count]:
+                hit = hit + 1
+            count = count + 1
+        print('Acerto:' + str(hit/len(y_kmeans)))
+        acurr.append(hit/len(y_kmeans))
+
+        #plotagem do kmeans
         plt.scatter(X[:,0], X[:,1], c=y_kmeans, cmap='viridis')
         plt.show()
         X = [] #zera vetor
         n_clusters = 0 #zera clusters
+
+    return acurr 
 
 if __name__ == "__main__":
     
