@@ -3,10 +3,16 @@ import numpy as np
 import math
 import matplotlib
 import matplotlib.pyplot as plt
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.wrappers.scikit_learn import KerasRegressor
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
+from sklearn.metrics import mean_squared_error
  
 #dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
 dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
@@ -27,11 +33,16 @@ def data_map(data):
     cluster_map = {'X':0, 'Y':1, 'XY':2, 'L':3}
     data['cluster'] = data['cluster'].map(cluster_map)
     return data
- 
+
+def drop_data(data):
+    return data.drop(labels=['datapointID', 'sampletype'], axis=1)
+
 def data_treat(dataset):
     #por enquanto vazio, mas aqui pode ser feito tratamentos
     dataset[0] = data_map(dataset[0])
     dataset[1] = data_map(dataset[1])
+    dataset[0] = drop_data(dataset[0])
+    dataset[1] = drop_data(dataset[1])
     return dataset
 
 def show_plots(data):
@@ -112,7 +123,7 @@ def linear_regression(dataset):
 
     #regressão linear da média da silhouette de cada plot com o score
     for id, sample in train.groupby('scatterplotID'):
-        feat = sample.silhouette.mean()*0.1
+        feat = sample.silhouette.median()*0.1
         feat = feat - sample.silhouette.std()
         x.append(feat) #feature
         y.append(score[score['scatterplotID'] == id].score.values[0]) #score do scatterplot
@@ -126,8 +137,10 @@ def linear_regression(dataset):
     print(r_sq)
 
     #predição de 4 scatterplot (apenas exemplo, mas é isso que vai para o submission)
-    y_pred = model.predict(x[2:6])
-    print(y_pred)
+    y_pred = model.predict(x)
+    score['train_predict'] = y_pred
+    train.to_csv(dataset_path + 'train_predict.csv')
+    #print(y_pred)
 
 def linear_regression_plot(dataset):
     train = dataset[0][0:]
@@ -286,6 +299,39 @@ def k_means(dataset):
 
     return acurr 
 
+def mpl_score(dataset):
+    train = dataset[0]
+    train = train[train['cluster'] != 3]
+    score = dataset[2]
+    
+    X = [] #dados para treino
+    Y = score['score'].values #o resultado que quero prever
+
+    #preencho os dados de treino
+    for _, sample in train.groupby('scatterplotID'):
+        #X.append([[sample['signalX'].values], [sample['signalY'].values], [sample['cluster'].values], [sample['silhouette'].values]])
+        X.append([sample.silhouette.std(), sample.silhouette.median()])
+
+    X = np.array(X)
+    Y = np.array(Y)
+
+    #modelo da rede neural
+    model = Sequential()
+    model.add(Dense(2, input_dim=2, kernel_initializer='normal', activation='relu'))
+    model.add(Dense(32, kernel_initializer='normal', activation='relu'))
+    #model.add(Dense(32, kernel_initializer='normal', activation='relu'))
+    model.add(Dense(1, kernel_initializer='normal', activation='linear'))
+	
+    #Compile model
+    model.compile(loss='mean_squared_error', optimizer='adam', metrics=["mean_squared_error"])
+
+    #treinamento da rede
+    model.fit(X, Y, epochs=10, batch_size=3, verbose=1, validation_split=0.2)
+
+    print('Predict:')
+    pred_train = model.predict(X)
+    print(np.sqrt(mean_squared_error(Y,pred_train)))
+
 if __name__ == "__main__":
     
     #define parte do csv que será carregada
@@ -325,4 +371,6 @@ if __name__ == "__main__":
     #
     #silhouette_statistic(dataset)
 
-    k_means(dataset)
+    #k_means(dataset)
+
+    mpl_score(dataset)

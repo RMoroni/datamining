@@ -1,0 +1,10 @@
+16.
+
+    (a): A saída da função irá indicar a raridade do termo, logo uma saída igual a 1 indica um termo raro e 0 um termo comum. Se um termo aparece apenas uma vez, a saída da função será 1. Se um termo se repete por todo documento, a saída será zero.
+
+    (b): Identificar quais termos são raros ou exceções no documento e utiliza-los para o teste de similaridade.
+
+20.
+    (a): O intervalo é entre -1 e 1, que são os valores possíveis de saída da função cosseno.
+    (b): Não. A saída da função cosseno indica qual o ângulo entre os objetos. No caso, quando o cosseno é igual a 1, o ângulo entre os objetos é zero.
+
