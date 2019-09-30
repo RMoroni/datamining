@@ -13,7 +13,8 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.metrics import mean_squared_error
- 
+import skfuzzy as fuzz
+
 #dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
 dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
 #dataset_path = 'C:'
@@ -297,7 +298,81 @@ def k_means(dataset):
         X = [] #zera vetor
         n_clusters = 0 #zera clusters
 
-    return acurr 
+    return acurr
+
+def fuzzy(dataset):
+    train = dataset[0][0:1920]
+    train = train[train['cluster'] != 3]
+    score = dataset[2]
+    #amostra = amostra[amostra.silhouette != -2]
+
+    for id, amostra in train.groupby('scatterplotID'):
+        classificacao_column = amostra['cluster']
+        classificacao = []
+        for classific in classificacao_column:
+            classificacao.append(classific)
+
+        sinal_x_column = amostra['signalX']
+        sinal_x = []
+        for ponto in sinal_x_column:
+            sinal_x.append(ponto)
+
+        sinal_y_column = amostra['signalY']
+        sinal_y = []
+        for ponto in sinal_y_column:
+            sinal_y.append(ponto)
+
+        data = np.array([sinal_x, sinal_y])
+
+        init = []  # centroide
+
+        # separa os clusters para descobrir o centro de cada um
+        cluster_x = amostra[amostra['cluster'] == 0]
+        cluster_y = amostra[amostra['cluster'] == 1]
+        cluster_xy = amostra[amostra['cluster'] == 2]
+
+        # para descobrir quantos clusters será utilizado no kmeans
+        # certeza tem jeito mais simples de fazer isso, mas funcionou então ok...
+        n_clusters = 0
+        if len(cluster_x) > 0:
+            n_clusters = n_clusters + 1
+            init.append([cluster_x.signalX.median(), cluster_x.signalY.median()])
+        if len(cluster_y) > 0:
+            n_clusters = n_clusters + 1
+            init.append([cluster_y.signalX.median(), cluster_y.signalY.median()])
+        if len(cluster_xy) > 0:
+            n_clusters = n_clusters + 1
+            init.append([cluster_xy.signalX.median(), cluster_xy.signalY.median()])
+
+        init = np.array(init)
+
+        # cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(data_teste, n_clusters, 2, error=0.005, maxiter=2, init=None)
+        u, _, _, _, _, fpc = fuzz.cluster.cmeans_predict(data, init, 2, error=0.005, maxiter=1000)
+        print('FPC:')
+        print(fpc)
+        valores = []
+        for i in range(len(classificacao)):
+            if u[classificacao[i]][i] < 0.4:
+                valores.append(1 - u[classificacao[i]])
+        media = 0
+        if len(valores) > 0:
+            media = np.mean(valores)
+            '''if len(u[0]) < 360 & len(u[0] > 340):
+                print(media * 1.2)
+            elif len(u[0] < 340):
+                print(media * 1.4)
+            else:
+                print(media)'''
+        else:
+            pass
+
+        print('Score:')
+        plot_score = score[score['scatterplotID'] == id].score.values[0]
+        print(plot_score)
+        print('Custers')
+        print(n_clusters)
+        print('Pred Score')
+        print(1-media)
 
 def mpl_score(dataset):
     train = dataset[0]
@@ -373,4 +448,8 @@ if __name__ == "__main__":
 
     #k_means(dataset)
 
-    mpl_score(dataset)
+    #mpl_score(dataset)
+    
+    #k_means(dataset)
+
+    fuzzy(dataset)
