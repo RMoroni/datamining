@@ -268,10 +268,10 @@ def k_means(dataset):
     return acurr
 
 def fuzzy(dataset):
-    train = dataset[0][0:1920]
+    train = dataset[0][0:3840]
     train = train[train['cluster'] != 3]
     score = dataset[2]
-    #amostra = amostra[amostra.silhouette != -2]
+    # amostra = amostra[amostra.silhouette != -2]
 
     for id, amostra in train.groupby('scatterplotID'):
         classificacao_column = amostra['cluster']
@@ -315,8 +315,20 @@ def fuzzy(dataset):
 
         # cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(data_teste, n_clusters, 2, error=0.005, maxiter=2, init=None)
         u, _, _, _, _, fpc = fuzz.cluster.cmeans_predict(data, init, 2, error=0.005, maxiter=1000)
-        print('FPC:')
-        print(fpc)
+        '''print('FPC:')
+        print(fpc)'''
+
+        if n_clusters == 2:
+            print('oi')
+            # guarda valores únicos
+            val, _ = np.unique(classificacao, return_counts=True)
+            val = np.sort(val)
+            classificacao = np.where(classificacao == val[0], 0, classificacao)
+            classificacao = np.where(classificacao == val[1], 1, classificacao)
+        elif n_clusters == 1:
+            val, _ = np.unique(classificacao, return_counts=True)
+            classificacao = np.where(classificacao == val[0], 0, classificacao)
+
         valores = []
         for i in range(len(classificacao)):
             if u[classificacao[i]][i] < 0.4:
@@ -333,13 +345,14 @@ def fuzzy(dataset):
         else:
             pass
 
-        print('Score:')
         plot_score = score[score['scatterplotID'] == id].score.values[0]
-        print(plot_score)
-        print('Custers')
-        print(n_clusters)
-        print('Pred Score')
-        print(1-media)
+        print('Clusters - ', n_clusters)
+        print('Score: ',plot_score)
+        print('Pred Score - ',1 - media)
+
+        #se for aplicar em regressão ou redes neurais imagino q o peso possa ser algo simples como:
+        #erro * (objetos mal classficados/total de objetos da amostra)
+        #media * (len(valores)/len(classificacao))
 
 def mlp_score(dataset):
     train = dataset[0]
