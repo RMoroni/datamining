@@ -13,10 +13,11 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.metrics import mean_squared_error
+from sklearn.neural_network import MLPRegressor
 import skfuzzy as fuzz
 
-#dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
-dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
+dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
+#dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
 #dataset_path = 'C:'
 
 def load_dataset(skiprows, nrows):
@@ -374,7 +375,7 @@ def fuzzy(dataset):
         print('Pred Score')
         print(1-media)
 
-def mpl_score(dataset):
+def mlp_score(dataset):
     train = dataset[0]
     train = train[train['cluster'] != 3]
     score = dataset[2]
@@ -384,17 +385,29 @@ def mpl_score(dataset):
 
     #preencho os dados de treino
     for _, sample in train.groupby('scatterplotID'):
-        #X.append([[sample['signalX'].values], [sample['signalY'].values], [sample['cluster'].values], [sample['silhouette'].values]])
-        X.append([sample.silhouette.std(), sample.silhouette.median()])
+        X.append([sample.silhouette.std(), 
+        sample.silhouette.median(), 
+        sample.silhouette.mean(),
+        sample.signalX.std(), 
+        sample.signalY.std()])
 
-    X = np.array(X)
-    Y = np.array(Y)
+    #X = np.array(X)
+    #Y = np.array(Y).reshape((-1, 1))
 
+    scaler = StandardScaler()
+    scaler.fit(X)
+    X = scaler.transform(X)
+    Y = scaler.transform(Y)
+
+    mlp = MLPRegressor(hidden_layer_sizes=(10,20,40,20,10), activation='relu', solver='adam', learning_rate='adaptive', max_iter=1000, learning_rate_init=0.01)
+    mlp.fit(X, Y)
+    print(mlp.predict(X[0:10]))
     #modelo da rede neural
-    model = Sequential()
-    model.add(Dense(2, input_dim=2, kernel_initializer='normal', activation='relu'))
-    model.add(Dense(32, kernel_initializer='normal', activation='relu'))
-    #model.add(Dense(32, kernel_initializer='normal', activation='relu'))
+    '''model = Sequential()
+    model.add(Dense(5, input_dim=5, kernel_initializer='normal', activation='relu'))
+    model.add(Dense(10, kernel_initializer='normal', activation='relu'))
+    model.add(Dense(10, kernel_initializer='normal', activation='relu'))
+    model.add(Dense(10, kernel_initializer='normal', activation='relu'))
     model.add(Dense(1, kernel_initializer='normal', activation='linear'))
 	
     #Compile model
@@ -403,9 +416,9 @@ def mpl_score(dataset):
     #treinamento da rede
     model.fit(X, Y, epochs=10, batch_size=3, verbose=1, validation_split=0.2)
 
-    print('Predict:')
-    pred_train = model.predict(X)
-    print(np.sqrt(mean_squared_error(Y,pred_train)))
+    #print('Predict:')
+    print(model.predict(X[0:10]))'''
+    #print(np.sqrt(mean_squared_error(Y,pred_train)))
 
 if __name__ == "__main__":
     
@@ -448,8 +461,8 @@ if __name__ == "__main__":
 
     #k_means(dataset)
 
-    #mpl_score(dataset)
+    mlp_score(dataset)
     
     #k_means(dataset)
 
-    fuzzy(dataset)
+    #fuzzy(dataset)
