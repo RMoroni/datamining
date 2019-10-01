@@ -155,14 +155,14 @@ def linear_regression_plot(dataset):
     x = []
     y = []
 
-    feat = 1.0
+    #feat = 1.0
     #regressão linear da média da silhouette de cada plot com o score
     for id, sample in train.groupby('scatterplotID'):
        #x.append(sample.silhouette.mean())
-        feat = feat - (abs(sample.silhouette.mean()-sample.silhouette.median()) + sample.silhouette.std())
-        x.append(feat)
+        #feat = feat - (abs(sample.silhouette.mean()-sample.silhouette.median()) + sample.silhouette.std())
+        x.append(score[score['scatterplotID'] == id].fuzzy.values[0])
         y.append(score[score['scatterplotID'] == id].score.values[0])
-        feat = 1.0
+        #feat = 1.0
 
     #basicamente, se a feat estiver 'boa', os dados poderão ser aproximados por uma reta
     plt.scatter(x, y)
@@ -273,7 +273,7 @@ def k_means(dataset):
 def fuzzy(dataset):
     train = dataset
     train = train[train['cluster'] != 3]
-    #score = dataset[2]
+    #score = dataset[2][0:]
     # amostra = amostra[amostra.silhouette != -2]
 
     FPC = []
@@ -365,9 +365,14 @@ def fuzzy(dataset):
         #erro * (objetos mal classficados/total de objetos da amostra)
         #media * (len(valores)/len(classificacao))
     #submission(test_id, score)
+    #train['media'] = ERRO
+    #dataset[0] = train
+    '''score['fuzzy'] = FPC
+    dataset[2] = score
+    linear_regression_plot(dataset)'''
     return [FPC, ERRO, ID]
 
-def mlp_exec(train, label):
+def mlp_exec(train, label, test):
 
     #faço esse paranaue pra voltar a lista a DF, não achei outra forma :(
     train_list = []
@@ -413,31 +418,6 @@ def mlp_exec(train, label):
 
     #predição (aqui sai boa)
     print(mlp.predict(X[0:10]))
-    return mlp
-
-def mlp_score(dataset):
-    train = dataset[0]
-    train = train[train['cluster'] != 3]
-    test = dataset[1][0:]
-    test = test[test['cluster'] != 3]
-    score = dataset[2][0:]
-
-    X = [] #treino
-    Y = [] #labels
-    mlp = None
-    count = 0
-    #executa a rede neural por partes (tudo de uma vez fica zuado)
-    for _,scr in score.iterrows():
-        scatter = train[train['scatterplotID'] == scr['scatterplotID']]
-        X.append(scatter)
-        Y.append(scr)
-        count = count + 1
-        if count == 100:
-            mlp = mlp_exec(X,Y)
-            count = 0
-            X = []
-            Y = []
-            break
 
     #teste e salva para submissão
     fuzzy_return = None
@@ -462,9 +442,105 @@ def mlp_score(dataset):
     predict = mlp.predict(X_test) #acho que essa desgraça tá com overfit, o predict do test é horrível
     submission(test_id, predict)
 
+def mlp_score(dataset):
+    train = dataset[0]
+    train = train[train['cluster'] != 3]
+    test = dataset[1][0:]
+    test = test[test['cluster'] != 3]
+    score = dataset[2][0:]
+
+    X = [] #treino
+    Y = [] #labels
+    
+    count = 0
+    #executa a rede neural por partes (tudo de uma vez fica zuado)
+    print('carregando...')
+    for _,scr in score.iterrows():
+        scatter = train[train['scatterplotID'] == scr['scatterplotID']]
+        X.append(scatter)
+        Y.append(scr)
+        count = count + 1
+        if count == 100:
+            mlp_exec(X,Y, test)
+            count = 0
+            X = []
+            Y = []
+            #break
+
 def submission(test_id, predict):
     submission_df = pd.DataFrame({'scatterplotID':test_id, 'score':predict})
     submission_df.to_csv(dataset_path + 'submission.csv', index=False)
+
+def mlp_simples(dataset):
+    #detalhe que só estou usando uma parte do treino, esse valor (38400) tem que ser compativel com valor no score(118) por causa do shape
+    train = dataset[0][0:38400]
+    train = train[train['cluster'] != 3]
+    test = dataset[1]
+    test = test[test['cluster'] != 3]
+    score = dataset[2][0:118]
+    
+    X = [] #dados para treino
+    Y = score['score'].values #o resultado que quero prever
+
+    #pra usar as features do fuzzy é só descomentar e incluir: fuzzy_sample.erro,fuzzy_sample.fpc no append
+    #na função do fuzzy, o dataset precisa estar assim: train = dataset, caso contrário dá ruim
+    #fuzzy_return = fuzzy(train)
+    #fuzzy_df = pd.DataFrame({'id':fuzzy_return[2], 'erro':fuzzy_return[1], 'fpc':fuzzy_return[0]})
+    #preencho os dados de treino
+    for id, sample in train.groupby('scatterplotID'):
+        #fuzzy_sample = fuzzy_df[fuzzy_df['id'] == id]
+        X.append([sample.silhouette.std(), 
+        sample.silhouette.median(),
+        sample.silhouette.max(),
+        sample.silhouette.min(),
+        sample.signalY.max(),
+        sample.signalY.min(),
+        sample.signalY.mean(),
+        sample.signalX.max(),
+        sample.signalX.min(),
+        sample.signalX.mean()])
+    
+    #normalização
+    X = np.array(X)
+    scaler = StandardScaler()
+    scaler.fit(X)
+    X = scaler.transform(X)
+
+    #treinamento (com 3 de 100 fica um resultado 'razoavel', mudando pra 1000 a convergencia é mais rápida, mas tem seus problemas)
+    mlp = MLPRegressor(hidden_layer_sizes=(1000,1000,1000), max_iter=1000, verbose=True)
+    mlp.fit(X, Y)
+
+    #predição usando treino
+    print(mlp.predict(X[0:10]))
+
+    #pra salvar os testes no submission, só descomentar esse trecho
+    '''print ('testes')
+    fuzzy_return = None
+    fuzzy_return = fuzzy(test)
+    fuzzy_df = None
+    fuzzy_df = pd.DataFrame({'id':fuzzy_return[2], 'erro':fuzzy_return[1], 'fpc':fuzzy_return[0]})
+    X_test = []
+    test_id = []
+    for id, sample in test.groupby('scatterplotID'):
+        fuzzy_sample = fuzzy_df[fuzzy_df['id'] == id]
+        X_test.append([sample.silhouette.std(), 
+        sample.silhouette.median(),
+        sample.silhouette.max(),
+        sample.silhouette.min(),
+        sample.signalY.max(),
+        sample.signalY.min(),
+        sample.signalY.mean(),
+        sample.signalX.max(),
+        sample.signalX.min(),
+        sample.signalX.mean()])
+        test_id.append(str(id))
+    
+    X_test = np.array(X_test)
+    scaler = StandardScaler()
+    scaler.fit(X_test)
+    X_test = scaler.transform(X_test)
+    predict = mlp.predict(X_test)
+    submission(test_id, predict)'''
 
 if __name__ == "__main__":
     
@@ -472,14 +548,15 @@ if __name__ == "__main__":
     #dessa forma é possível fazer o carregamento e processamento por partes
     skiprows = 0 #Pula nenhuma linha
     #skiprows = range(1,384) #Ou seja ignora as linhas de 1 a 385 (preciso da linha 0 p/ colunas)
-    nrows = 38400 #Quantas linhas serão carregadas
+    nrows = None #Quantas linhas serão carregadas
  
     #carrega o dataset
     dataset = load_dataset(skiprows, nrows)
  
     #trata o dataset
     dataset = data_treat(dataset)
-    mlp_score(dataset)
+    #mlp_score(dataset)
+    mlp_simples(dataset)
     
     #onde serão montados os gráficos
     #show_plots(dataset)
