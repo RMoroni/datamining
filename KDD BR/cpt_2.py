@@ -17,6 +17,9 @@ dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
 #dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
 #dataset_path = 'C:'
 
+global test_id
+global predict
+
 def load_dataset(skiprows, nrows):
     #abre o csv de treino e teste no caminho específicado
     train = pd.read_csv(dataset_path + 'training_dataset.csv', skiprows=skiprows, nrows=nrows)
@@ -268,11 +271,16 @@ def k_means(dataset):
     return acurr
 
 def fuzzy(dataset):
-    train = dataset[0][0:3840]
+    train = dataset
     train = train[train['cluster'] != 3]
-    score = dataset[2]
+    #score = dataset[2]
     # amostra = amostra[amostra.silhouette != -2]
 
+    FPC = []
+    ERRO = []
+    ID = []
+    #score=[]
+    #test_id=[]
     for id, amostra in train.groupby('scatterplotID'):
         classificacao_column = amostra['cluster']
         classificacao = []
@@ -317,9 +325,9 @@ def fuzzy(dataset):
         u, _, _, _, _, fpc = fuzz.cluster.cmeans_predict(data, init, 2, error=0.005, maxiter=1000)
         '''print('FPC:')
         print(fpc)'''
+        FPC.append(fpc)
 
         if n_clusters == 2:
-            print('oi')
             # guarda valores únicos
             val, _ = np.unique(classificacao, return_counts=True)
             val = np.sort(val)
@@ -345,60 +353,114 @@ def fuzzy(dataset):
         else:
             pass
 
-        plot_score = score[score['scatterplotID'] == id].score.values[0]
-        print('Clusters - ', n_clusters)
-        print('Score: ',plot_score)
-        print('Pred Score - ',1 - media)
-
+        #plot_score = score[score['scatterplotID'] == id].score.values[0]
+        #print('Clusters - ', n_clusters)
+        #print('Score: ',plot_score)
+        #print('Pred Score - ',1 - media)
+        #score.append(1 - media)
+        #test_id.append(id)
+        ERRO.append(media)
+        ID.append(id)
         #se for aplicar em regressão ou redes neurais imagino q o peso possa ser algo simples como:
         #erro * (objetos mal classficados/total de objetos da amostra)
         #media * (len(valores)/len(classificacao))
+    #submission(test_id, score)
+    return [FPC, ERRO, ID]
 
-def mlp_score(dataset):
-    train = dataset[0]
-    train = train[train['cluster'] != 3]
-    test = dataset[1]
-    test = test[test['cluster'] != 3]
-    score = dataset[2]
-    
+def mlp_exec(train, label):
+
+    #faço esse paranaue pra voltar a lista a DF, não achei outra forma :(
+    train_list = []
+    for row in train:
+        for item in row.iterrows():
+            train_list.append([int(item[1][0]), int(item[1][1]), int(item[1][2]), int(item[1][3]), item[1][4]])
+    train_df = pd.DataFrame(train_list, columns=['scatterplotID', 'signalX', 'signalY', 'cluster', 'silhouette'])
+    label_list = []
+    for row in label:
+        label_list.append([int(row[0]), row[1]])
+    label_df = pd.DataFrame(label_list, columns=['scatterplotID', 'score'])
+    fuzzy_return = fuzzy(train_df)
+    fuzzy_df = pd.DataFrame({'id':fuzzy_return[2], 'erro':fuzzy_return[1], 'fpc':fuzzy_return[0]})
+
     X = [] #dados para treino
-    Y = score['score'].values #o resultado que quero prever
-
+    Y = label_df.score.values
     #preencho os dados de treino
-    for _, sample in train.groupby('scatterplotID'):
+
+    for id, sample in train_df.groupby('scatterplotID'):
+        fuzzy_sample = fuzzy_df[fuzzy_df['id'] == id]
+        #features da rede
         X.append([sample.silhouette.std(), 
         sample.silhouette.median(),
         sample.silhouette.max(),
         sample.silhouette.min(),
         sample.signalY.max(),
         sample.signalY.min(),
-        sample.signalY.mean(),
         sample.signalX.max(),
         sample.signalX.min(),
-        sample.signalX.mean()])
+        fuzzy_sample.erro,
+        fuzzy_sample.fpc])
 
     X = np.array(X)
     scaler = StandardScaler()
     scaler.fit(X)
     X = scaler.transform(X)
 
-    mlp = MLPRegressor(hidden_layer_sizes=(100,100), max_iter=100, verbose=True)
+    #modelo da rede
+    mlp = MLPRegressor(hidden_layer_sizes=(1000,1000,1000), max_iter=1000, verbose=True)
+
+    #treinamento
     mlp.fit(X, Y)
+
+    #predição (aqui sai boa)
     print(mlp.predict(X[0:10]))
+    return mlp
+
+def mlp_score(dataset):
+    train = dataset[0]
+    train = train[train['cluster'] != 3]
+    test = dataset[1][0:]
+    test = test[test['cluster'] != 3]
+    score = dataset[2][0:]
+
+    X = [] #treino
+    Y = [] #labels
+    mlp = None
+    count = 0
+    #executa a rede neural por partes (tudo de uma vez fica zuado)
+    for _,scr in score.iterrows():
+        scatter = train[train['scatterplotID'] == scr['scatterplotID']]
+        X.append(scatter)
+        Y.append(scr)
+        count = count + 1
+        if count == 100:
+            mlp = mlp_exec(X,Y)
+            count = 0
+            X = []
+            Y = []
+            break
 
     #teste e salva para submissão
-    '''X_test = []
+    fuzzy_return = None
+    fuzzy_return = fuzzy(test)
+    fuzzy_df = None
+    fuzzy_df = pd.DataFrame({'id':fuzzy_return[2], 'erro':fuzzy_return[1], 'fpc':fuzzy_return[0]})
+    X_test = []
     test_id = []
     for id, sample in test.groupby('scatterplotID'):
+        fuzzy_sample = fuzzy_df[fuzzy_df['id'] == id]
         X_test.append([sample.silhouette.std(), 
-        sample.silhouette.median(), 
-        sample.silhouette.mean(),
-        sample.signalX.mean(), 
-        sample.signalY.mean(),
-        sample.cluster.median()])
+        sample.silhouette.median(),
+        sample.silhouette.max(),
+        sample.silhouette.min(),
+        sample.signalY.max(),
+        sample.signalY.min(),
+        sample.signalX.max(),
+        sample.signalX.min(),
+        fuzzy_sample.erro,
+        fuzzy_sample.fpc])
         test_id.append(str(id))
-    predict = mlp.predict(X_test)
-    submission(test_id, predict)'''
+    predict = mlp.predict(X_test) #acho que essa desgraça tá com overfit, o predict do test é horrível
+    submission(test_id, predict)
 
 def submission(test_id, predict):
     submission_df = pd.DataFrame({'scatterplotID':test_id, 'score':predict})
@@ -410,14 +472,15 @@ if __name__ == "__main__":
     #dessa forma é possível fazer o carregamento e processamento por partes
     skiprows = 0 #Pula nenhuma linha
     #skiprows = range(1,384) #Ou seja ignora as linhas de 1 a 385 (preciso da linha 0 p/ colunas)
-    nrows = None #Quantas linhas serão carregadas
+    nrows = 38400 #Quantas linhas serão carregadas
  
     #carrega o dataset
     dataset = load_dataset(skiprows, nrows)
  
     #trata o dataset
     dataset = data_treat(dataset)
- 
+    mlp_score(dataset)
+    
     #onde serão montados os gráficos
     #show_plots(dataset)
 
@@ -438,7 +501,7 @@ if __name__ == "__main__":
 
     #k_means(dataset)
 
-    mlp_score(dataset)
+    
     
     #k_means(dataset)
 
