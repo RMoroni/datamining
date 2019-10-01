@@ -3,9 +3,6 @@ import numpy as np
 import math
 import matplotlib
 import matplotlib.pyplot as plt
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.wrappers.scikit_learn import KerasRegressor
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
@@ -168,20 +165,6 @@ def linear_regression_plot(dataset):
     plt.scatter(x, y)
     plt.show()
 
-def pca(dataset):
-    train = dataset[0]
-    x = train[['signalX', 'signalY']]
-    x = StandardScaler().fit_transform(x)
- 
-    #PCA ocorre aqui
-    pca = PCA(n_components=2)
-    principalComponents = pca.fit_transform(x)
-    df = pd.DataFrame(data = principalComponents, columns = ['pca1', 'pca2'])
- 
-    colors = ['red', 'green', 'blue', 'purple']
-    plt.scatter(df['pca1'], df['pca2'], c=train['cluster'], cmap=matplotlib.colors.ListedColormap(colors))
-    plt.show()
-
 def silhouette_statistic(dataset):
     train = dataset[0][0:]
     score = dataset[2]
@@ -208,23 +191,6 @@ def silhouette_statistic(dataset):
 
     df = pd.DataFrame(dict)
     df.to_csv(dataset_path + 'silhouette_statistic.csv')
-
-def correlation(dataset):
-    train = dataset[0][0:]
-    score = dataset[2]
-
-    #retira com label L
-    train = train[train['cluster'] != 3]
-
-    #adiciona o score para ficar no mesmo DF
-    train['score'] = score['score']
-    #caso outra feat seja adiciona, é só repetir o processo acima
-
-    #retiro duas colunas (axis=1 -> remove coluna inteira)
-    train.drop(['datapointID', 'sampletype'], axis=1)
-
-    #imprime a correlação entre os dados no DF: -1 (anti-correlação) a 1 (correlação perfeita)
-    print(train.corr())
 
 def k_means(dataset):
     '''
@@ -378,6 +344,8 @@ def fuzzy(dataset):
 def mlp_score(dataset):
     train = dataset[0]
     train = train[train['cluster'] != 3]
+    test = dataset[1]
+    test = test[test['cluster'] != 3]
     score = dataset[2]
     
     X = [] #dados para treino
@@ -386,39 +354,42 @@ def mlp_score(dataset):
     #preencho os dados de treino
     for _, sample in train.groupby('scatterplotID'):
         X.append([sample.silhouette.std(), 
-        sample.silhouette.median(), 
-        sample.silhouette.mean(),
-        sample.signalX.std(), 
-        sample.signalY.std()])
+        sample.silhouette.median(),
+        sample.silhouette.max(),
+        sample.silhouette.min(),
+        sample.signalY.max(),
+        sample.signalY.min(),
+        sample.signalY.mean(),
+        sample.signalX.max(),
+        sample.signalX.min(),
+        sample.signalX.mean()])
 
-    #X = np.array(X)
-    #Y = np.array(Y).reshape((-1, 1))
-
+    X = np.array(X)
     scaler = StandardScaler()
     scaler.fit(X)
     X = scaler.transform(X)
-    Y = scaler.transform(Y)
 
-    mlp = MLPRegressor(hidden_layer_sizes=(10,20,40,20,10), activation='relu', solver='adam', learning_rate='adaptive', max_iter=1000, learning_rate_init=0.01)
+    mlp = MLPRegressor(hidden_layer_sizes=(100,100), max_iter=100, verbose=True)
     mlp.fit(X, Y)
     print(mlp.predict(X[0:10]))
-    #modelo da rede neural
-    '''model = Sequential()
-    model.add(Dense(5, input_dim=5, kernel_initializer='normal', activation='relu'))
-    model.add(Dense(10, kernel_initializer='normal', activation='relu'))
-    model.add(Dense(10, kernel_initializer='normal', activation='relu'))
-    model.add(Dense(10, kernel_initializer='normal', activation='relu'))
-    model.add(Dense(1, kernel_initializer='normal', activation='linear'))
-	
-    #Compile model
-    model.compile(loss='mean_squared_error', optimizer='adam', metrics=["mean_squared_error"])
 
-    #treinamento da rede
-    model.fit(X, Y, epochs=10, batch_size=3, verbose=1, validation_split=0.2)
+    #teste e salva para submissão
+    '''X_test = []
+    test_id = []
+    for id, sample in test.groupby('scatterplotID'):
+        X_test.append([sample.silhouette.std(), 
+        sample.silhouette.median(), 
+        sample.silhouette.mean(),
+        sample.signalX.mean(), 
+        sample.signalY.mean(),
+        sample.cluster.median()])
+        test_id.append(str(id))
+    predict = mlp.predict(X_test)
+    submission(test_id, predict)'''
 
-    #print('Predict:')
-    print(model.predict(X[0:10]))'''
-    #print(np.sqrt(mean_squared_error(Y,pred_train)))
+def submission(test_id, predict):
+    submission_df = pd.DataFrame({'scatterplotID':test_id, 'score':predict})
+    submission_df.to_csv(dataset_path + 'submission.csv', index=False)
 
 if __name__ == "__main__":
     
@@ -446,15 +417,8 @@ if __name__ == "__main__":
     #montei essa função pra tentar deixar 'linear' antes de passar para regressão
     #linear_regression_plot(dataset)
 
-    #pca -> mantem o mesmo número de dimensões, mas 'ajusta' de forma que o padrão entre os samples fiquem 'iguais'
-    #apesar de não fazer sentido na questão do pca (por manter as mesmas dimensões), o 'ajuste' mostra que os samples são muito parecidos
-    #pca(dataset)
-
     #regressão linear
     #linear_regression(dataset)
-
-    #correlação
-    #correlation(dataset)
     
     #
     #silhouette_statistic(dataset)
