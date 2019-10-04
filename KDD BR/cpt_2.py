@@ -1,12 +1,8 @@
 import pandas as pd
 import numpy as np
-import math
 import matplotlib
 import matplotlib.pyplot as plt
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
 from sklearn.metrics import mean_squared_error
@@ -16,9 +12,6 @@ import skfuzzy as fuzz
 dataset_path = '/home/rodrigo/Documents/kddbr-2019/public/'
 #dataset_path = '/home/viviane/Documents/kddbr-2019/public/'
 #dataset_path = 'C:'
-
-global test_id
-global predict
 
 def load_dataset(skiprows, nrows):
     #abre o csv de treino e teste no caminho específicado
@@ -37,6 +30,7 @@ def data_map(data):
     return data
 
 def drop_data(data):
+    #retira as duas colunas, basicamentes elas não fazem diferença
     return data.drop(labels=['datapointID', 'sampletype'], axis=1)
 
 def data_treat(dataset):
@@ -111,6 +105,7 @@ def frequency_clusters(dataset):
     plt.show()
 
 def linear_regression(dataset):
+    #regressão linear simples, a feature atual é só um exemplo...
     train = dataset[0][0:]
     score = dataset[2]
 
@@ -131,20 +126,20 @@ def linear_regression(dataset):
         y.append(score[score['scatterplotID'] == id].score.values[0]) #score do scatterplot
         feat = 0.0
 
-    x = np.array(x).reshape((-1, 1)) #tem que fazer isso aqui, sei lá pq
+    x = np.array(x).reshape((-1, 1))
     y = np.array(y)
 
     model = LinearRegression().fit(x, y) #gera o modelo de regressão linear
-    r_sq = model.score(x, y) #calcular a taxa de correlação (printada depois)
+    r_sq = model.score(x, y) #calcular a taxa de correlação
     print(r_sq)
 
-    #predição de 4 scatterplot (apenas exemplo, mas é isso que vai para o submission)
     y_pred = model.predict(x)
     score['train_predict'] = y_pred
     train.to_csv(dataset_path + 'train_predict.csv')
     #print(y_pred)
 
 def linear_regression_plot(dataset):
+    #ideia era plotar um gráfico (feature X score) para buscar uma feature que pudesse ser aplicado a regressão linear
     train = dataset[0][0:]
     score = dataset[2]
 
@@ -155,20 +150,21 @@ def linear_regression_plot(dataset):
     x = []
     y = []
 
-    #feat = 1.0
+    feat = 1.0
     #regressão linear da média da silhouette de cada plot com o score
     for id, sample in train.groupby('scatterplotID'):
-       #x.append(sample.silhouette.mean())
-        #feat = feat - (abs(sample.silhouette.mean()-sample.silhouette.median()) + sample.silhouette.std())
-        x.append(score[score['scatterplotID'] == id].fuzzy.values[0])
+        feat = feat - (abs(sample.silhouette.mean()-sample.silhouette.median()) + sample.silhouette.std())
+        x.append(feat)
         y.append(score[score['scatterplotID'] == id].score.values[0])
-        #feat = 1.0
+        feat = 1.0
 
     #basicamente, se a feat estiver 'boa', os dados poderão ser aproximados por uma reta
     plt.scatter(x, y)
     plt.show()
 
 def silhouette_statistic(dataset):
+    #salva algumas features a partir da silhueta, a ideia era encontra alguma correlação com o score
+    #correlçao não foi encontrada, mas fica como exemplo de que deu errado
     train = dataset[0][0:]
     score = dataset[2]
 
@@ -196,19 +192,13 @@ def silhouette_statistic(dataset):
     df.to_csv(dataset_path + 'silhouette_statistic.csv')
 
 def k_means(dataset):
-    '''
-    Algumas possibilidades:
-        * esquecer que isso existiu
-        * tentar melhorar isso aqui e usar como previsor
-        * (também) utilizar o vetor acurr para formar o x na regressão linear
-    '''
+    #kmeans, ideia era agrupar e descobrir quais pontos era díficeis de rotular (e em seguida estimar o score)
+    #como a clusterização ficou muito longe da original, a ideia com kmeans foi abondonada, mas seguie para o fuzzy
     train = dataset[0][0:3840]
     score = dataset[2]
     train = train[train['cluster'] != 3]
     
-    acurr = [] #vou salvar aqui a 'taxa' de acerto pra utilizar depois como probabilidade de 'erro'
-    #pra criar um 'score individual' é preciso colocar mais uma coluna no train['score_indi'] = val
-    #e adicionar se acertou e errou, depois alterar para considerar outros aspectos...
+    acurr = []
     X = []
     n_clusters = 0
     for id, sample in train.groupby('scatterplotID'):
@@ -234,7 +224,6 @@ def k_means(dataset):
     
         init = np.array(init)
 
-        #como nem todos scatter tem todas classes, n_clusters será o max + 1 (essa conta tá errada na vdd)
         #como o centroide já está no lugar 'certo', n_init=1, pra não tentar alterar posição do centroide
         kmeans = KMeans(n_clusters=n_clusters, init=init, n_jobs=-1, n_init=1, max_iter=300)
 
@@ -372,102 +361,8 @@ def fuzzy(dataset):
     linear_regression_plot(dataset)'''
     return [FPC, ERRO, ID]
 
-def mlp_exec(train, label, test):
-
-    #faço esse paranaue pra voltar a lista a DF, não achei outra forma :(
-    train_list = []
-    for row in train:
-        for item in row.iterrows():
-            train_list.append([int(item[1][0]), int(item[1][1]), int(item[1][2]), int(item[1][3]), item[1][4]])
-    train_df = pd.DataFrame(train_list, columns=['scatterplotID', 'signalX', 'signalY', 'cluster', 'silhouette'])
-    label_list = []
-    for row in label:
-        label_list.append([int(row[0]), row[1]])
-    label_df = pd.DataFrame(label_list, columns=['scatterplotID', 'score'])
-    fuzzy_return = fuzzy(train_df)
-    fuzzy_df = pd.DataFrame({'id':fuzzy_return[2], 'erro':fuzzy_return[1], 'fpc':fuzzy_return[0]})
-
-    X = [] #dados para treino
-    Y = label_df.score.values
-    #preencho os dados de treino
-
-    for id, sample in train_df.groupby('scatterplotID'):
-        fuzzy_sample = fuzzy_df[fuzzy_df['id'] == id]
-        #features da rede
-        X.append([sample.silhouette.std(), 
-        sample.silhouette.median(),
-        sample.silhouette.max(),
-        sample.silhouette.min(),
-        sample.signalY.max(),
-        sample.signalY.min(),
-        sample.signalX.max(),
-        sample.signalX.min(),
-        fuzzy_sample.erro,
-        fuzzy_sample.fpc])
-
-    X = np.array(X)
-    scaler = StandardScaler()
-    scaler.fit(X)
-    X = scaler.transform(X)
-
-    #modelo da rede
-    mlp = MLPRegressor(hidden_layer_sizes=(1000,1000,1000), max_iter=1000, verbose=True)
-
-    #treinamento
-    mlp.fit(X, Y)
-
-    #predição (aqui sai boa)
-    print(mlp.predict(X[0:10]))
-
-    #teste e salva para submissão
-    fuzzy_return = None
-    fuzzy_return = fuzzy(test)
-    fuzzy_df = None
-    fuzzy_df = pd.DataFrame({'id':fuzzy_return[2], 'erro':fuzzy_return[1], 'fpc':fuzzy_return[0]})
-    X_test = []
-    test_id = []
-    for id, sample in test.groupby('scatterplotID'):
-        fuzzy_sample = fuzzy_df[fuzzy_df['id'] == id]
-        X_test.append([sample.silhouette.std(), 
-        sample.silhouette.median(),
-        sample.silhouette.max(),
-        sample.silhouette.min(),
-        sample.signalY.max(),
-        sample.signalY.min(),
-        sample.signalX.max(),
-        sample.signalX.min(),
-        fuzzy_sample.erro,
-        fuzzy_sample.fpc])
-        test_id.append(str(id))
-    predict = mlp.predict(X_test) #acho que essa desgraça tá com overfit, o predict do test é horrível
-    submission(test_id, predict)
-
-def mlp_score(dataset):
-    train = dataset[0]
-    train = train[train['cluster'] != 3]
-    test = dataset[1][0:]
-    test = test[test['cluster'] != 3]
-    score = dataset[2][0:]
-
-    X = [] #treino
-    Y = [] #labels
-    
-    count = 0
-    #executa a rede neural por partes (tudo de uma vez fica zuado)
-    print('carregando...')
-    for _,scr in score.iterrows():
-        scatter = train[train['scatterplotID'] == scr['scatterplotID']]
-        X.append(scatter)
-        Y.append(scr)
-        count = count + 1
-        if count == 100:
-            mlp_exec(X,Y, test)
-            count = 0
-            X = []
-            Y = []
-            #break
-
 def submission(test_id, predict):
+    #recebe dois vetores, transforma em dataframe e salva o csv
     submission_df = pd.DataFrame({'scatterplotID':test_id, 'score':predict})
     submission_df.to_csv(dataset_path + 'submission.csv', index=False)
 
@@ -482,13 +377,12 @@ def mlp_simples(dataset):
     X = [] #dados para treino
     Y = score['score'].values #o resultado que quero prever
 
-    #pra usar as features do fuzzy é só descomentar e incluir: fuzzy_sample.erro,fuzzy_sample.fpc no append
-    #na função do fuzzy, o dataset precisa estar assim: train = dataset, caso contrário dá ruim
-    #fuzzy_return = fuzzy(train)
-    #fuzzy_df = pd.DataFrame({'id':fuzzy_return[2], 'erro':fuzzy_return[1], 'fpc':fuzzy_return[0]})
+    fuzzy_return = fuzzy(train)
+    fuzzy_df = pd.DataFrame({'id':fuzzy_return[2], 'erro':fuzzy_return[1], 'fpc':fuzzy_return[0]})
+
     #preencho os dados de treino
     for id, sample in train.groupby('scatterplotID'):
-        #fuzzy_sample = fuzzy_df[fuzzy_df['id'] == id]
+        fuzzy_sample = fuzzy_df[fuzzy_df['id'] == id]
         X.append([sample.silhouette.std(), 
         sample.silhouette.median(),
         sample.silhouette.max(),
@@ -498,7 +392,9 @@ def mlp_simples(dataset):
         sample.signalY.mean(),
         sample.signalX.max(),
         sample.signalX.min(),
-        sample.signalX.mean()])
+        sample.signalX.mean(),
+        fuzzy_sample.erro,
+        fuzzy_sample.fpc])
     
     #normalização
     X = np.array(X)
@@ -506,15 +402,16 @@ def mlp_simples(dataset):
     scaler.fit(X)
     X = scaler.transform(X)
 
-    #treinamento (com 3 de 100 fica um resultado 'razoavel', mudando pra 1000 a convergencia é mais rápida, mas tem seus problemas)
-    mlp = MLPRegressor(hidden_layer_sizes=(1000,1000,1000), max_iter=1000, verbose=True)
+    #treinamento: com 3 de 100 fica um resultado 'razoavel', mudando pra 1000 a convergencia é mais rápida)
+    #max_iter: a convergência ocorre um pouco depois de 100, então 200 é razoável...
+    mlp = MLPRegressor(hidden_layer_sizes=(1000,1000,1000), max_iter=200, verbose=True)
     mlp.fit(X, Y)
 
     #predição usando treino
     print(mlp.predict(X[0:10]))
 
     #pra salvar os testes no submission, só descomentar esse trecho
-    '''print ('testes')
+    '''
     fuzzy_return = None
     fuzzy_return = fuzzy(test)
     fuzzy_df = None
@@ -532,14 +429,21 @@ def mlp_simples(dataset):
         sample.signalY.mean(),
         sample.signalX.max(),
         sample.signalX.min(),
-        sample.signalX.mean()])
+        sample.signalX.mean(),
+        fuzzy_sample.erro,
+        fuzzy_sample.fpc])
         test_id.append(str(id))
     
+    #normaliza os dados de teste
     X_test = np.array(X_test)
     scaler = StandardScaler()
     scaler.fit(X_test)
     X_test = scaler.transform(X_test)
+
+    #faz a predição e salva em predict
     predict = mlp.predict(X_test)
+
+    #envia para ser salvo no arquivo
     submission(test_id, predict)'''
 
 if __name__ == "__main__":
@@ -555,7 +459,8 @@ if __name__ == "__main__":
  
     #trata o dataset
     dataset = data_treat(dataset)
-    #mlp_score(dataset)
+
+    #rede neural (utiliza o fuzzy)
     mlp_simples(dataset)
     
     #onde serão montados os gráficos
@@ -564,22 +469,11 @@ if __name__ == "__main__":
     #mostra a frequencia dos clusters para amostras com alto score e baixo score
     #frequency_clusters(dataset)
 
-    #mostra anomalias
-    #anomalia_clusters(dataset)
-
-    #montei essa função pra tentar deixar 'linear' antes de passar para regressão
+    #plot para ajudar a montar a regressão
     #linear_regression_plot(dataset)
 
     #regressão linear
     #linear_regression(dataset)
-    
-    #
-    #silhouette_statistic(dataset)
 
-    #k_means(dataset)
-
-    
-    
-    #k_means(dataset)
-
+    #clusterização com fuzzy
     #fuzzy(dataset)
