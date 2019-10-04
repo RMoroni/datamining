@@ -260,32 +260,34 @@ def k_means(dataset):
     return acurr
 
 def fuzzy(dataset):
-    train = dataset
-    train = train[train['cluster'] != 3]
-    #score = dataset[2][0:]
-    # amostra = amostra[amostra.silhouette != -2]
-
+    # para armazenar o fpc de cada amostra
     FPC = []
+    # para armazenar o erro fuzzy de cada amostra
     ERRO = []
-    ID = []
-    #score=[]
-    #test_id=[]
-    for id, amostra in train.groupby('scatterplotID'):
+    # para armazenar a quantidade de objetos L de cada amostra
+    L = []
+
+    # para cada amostra...
+    for id, amostra in data.groupby('scatterplotID'):
+        # armazena o cluster de cada objeto em uma lista
         classificacao_column = amostra['cluster']
         classificacao = []
         for classific in classificacao_column:
             classificacao.append(classific)
 
+        # armazena o sinal X de cada objeto em uma lista
         sinal_x_column = amostra['signalX']
         sinal_x = []
         for ponto in sinal_x_column:
             sinal_x.append(ponto)
 
+        # armazena o sinal Y de cada objeto em uma lista
         sinal_y_column = amostra['signalY']
         sinal_y = []
         for ponto in sinal_y_column:
             sinal_y.append(ponto)
 
+        # cria um np array com as listas do sinal X e do sinal Y
         data = np.array([sinal_x, sinal_y])
 
         init = []  # centroide
@@ -295,8 +297,7 @@ def fuzzy(dataset):
         cluster_y = amostra[amostra['cluster'] == 1]
         cluster_xy = amostra[amostra['cluster'] == 2]
 
-        # para descobrir quantos clusters será utilizado no kmeans
-        # certeza tem jeito mais simples de fazer isso, mas funcionou então ok...
+        # para descobrir quantos clusters existem e os centróides de cada um
         n_clusters = 0
         if len(cluster_x) > 0:
             n_clusters = n_clusters + 1
@@ -310,12 +311,10 @@ def fuzzy(dataset):
 
         init = np.array(init)
 
-        # cntr, u, u0, d, jm, p, fpc = fuzz.cluster.cmeans(data_teste, n_clusters, 2, error=0.005, maxiter=2, init=None)
+        # realiza o agrupamento passando os centróides como parâmetro
         u, _, _, _, _, fpc = fuzz.cluster.cmeans_predict(data, init, 2, error=0.005, maxiter=1000)
-        '''print('FPC:')
-        print(fpc)'''
-        FPC.append(fpc)
 
+        # refaz o vetor de classificação porque será utilizado para acessar a matriz fuzzy
         if n_clusters == 2:
             # guarda valores únicos
             val, _ = np.unique(classificacao, return_counts=True)
@@ -326,40 +325,35 @@ def fuzzy(dataset):
             val, _ = np.unique(classificacao, return_counts=True)
             classificacao = np.where(classificacao == val[0], 0, classificacao)
 
-        valores = []
-        for i in range(len(classificacao)):
-            if u[classificacao[i]][i] < 0.4:
-                valores.append(1 - u[classificacao[i]])
+        # filtra os objetos mal classificados e armazena numa lista o erro de cada um
+        erros = []
+        if n_clusters == 3:
+            for i in range(len(classificacao)):
+                if u[classificacao[i]][i] < 0.45 and u[classificacao[i]][i] > 0.2:
+                    erros.append(1 - u[classificacao[i]])
+        elif n_clusters == 2:
+            for i in range(len(classificacao)):
+                if u[classificacao[i]][i] < 0.65 and u[classificacao[i]][i] > 0.3:
+                    erros.append(1 - u[classificacao[i]])
+        else:
+            for i in range(len(classificacao)):
+                if u[classificacao[i]][i] < 0.85 and u[classificacao[i]][i] > 0.4:
+                    erros.append(1 - u[classificacao[i]])
+
         media = 0
-        if len(valores) > 0:
-            media = np.mean(valores)
-            '''if len(u[0]) < 360 & len(u[0] > 340):
-                print(media * 1.2)
-            elif len(u[0] < 340):
-                print(media * 1.4)
-            else:
-                print(media)'''
+        if len(erros) > 0:
+            media = np.mean(erros)  # calcula a média dos erros
         else:
             pass
 
-        #plot_score = score[score['scatterplotID'] == id].score.values[0]
-        #print('Clusters - ', n_clusters)
-        #print('Score: ',plot_score)
-        #print('Pred Score - ',1 - media)
-        #score.append(1 - media)
-        #test_id.append(id)
-        ERRO.append(media)
-        ID.append(id)
-        #se for aplicar em regressão ou redes neurais imagino q o peso possa ser algo simples como:
-        #erro * (objetos mal classficados/total de objetos da amostra)
-        #media * (len(valores)/len(classificacao))
-    #submission(test_id, score)
-    #train['media'] = ERRO
-    #dataset[0] = train
-    '''score['fuzzy'] = FPC
-    dataset[2] = score
-    linear_regression_plot(dataset)'''
-    return [FPC, ERRO, ID]
+        # armazena o fpc da amostra
+        FPC.append(fpc)
+        # realiza o cálculo para ponderar o erro e armazena
+        ERRO.append(media * (len(erros) / len(classificacao)))
+        # armazena a quantidade de objetos L
+        L.append(384 - len(classificacao))
+
+    return [ERRO, L, FPC]
 
 def submission(test_id, predict):
     #recebe dois vetores, transforma em dataframe e salva o csv
@@ -445,6 +439,96 @@ def mlp_simples(dataset):
 
     #envia para ser salvo no arquivo
     submission(test_id, predict)'''
+
+def multiple_linear_regression(dataset):
+    # separa os dados de treino e de teste
+    train = dataset[0][0:]
+    test = dataset[1][0:]
+    score = dataset[2]
+
+    # retira os objetos L
+    train = train[train['cluster'] != 3]
+    test = test[test['cluster'] != 3]
+
+    # aplica a técnica fuzzy nos dados de treino e separa as features de retorno
+    valores_fuzzy = fuzzy(train)
+    erros_fuzzy = valores_fuzzy[0]
+    l_fuzzy = valores_fuzzy[1]
+    fpc_fuzzy = valores_fuzzy[2]
+
+    # inicializa as features estatísticas e o score
+    mediana = []
+    desvio_padrao = []
+    variancia = []
+    media = []
+    desvio_absoluto = []
+    y = []
+
+    i = 0
+    for id, sample in train.groupby('scatterplotID'):
+        # calcula e armazena as features estatísticas
+        variancia.append(sample.silhouette.var())
+        media.append(sample.silhouette.mean())
+        mediana.append(sample.silhouette.median())
+        desvio_padrao.append(sample.silhouette.std())
+        desvio_absoluto.append(sample.silhouette.mad())
+
+        # armazena os scores dos dados de treino
+        y.append(score[score['scatterplotID'] == id].score.values[0])
+        i += 1
+
+    # agrupa as variaveis preditoras
+    x = np.column_stack((erros_fuzzy, l_fuzzy, fpc_fuzzy, mediana, desvio_padrao, variancia, media, desvio_absoluto))
+    # separa o conjunto de dados em Conjunto de Treino e Validação
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=10)
+
+    y = np.array(y)
+    # gera o modelo de regressão linear
+    #model = LinearRegression().fit(x, y)
+    model = LinearRegression().fit(X_train, y_train)
+
+    # PREDIÇÃO
+    # realiza o procedimento de criação das features para os dados de teste
+
+    valores_fuzzy_2 = fuzzy(test)
+    erros_fuzzy_2 = valores_fuzzy_2[0]
+    l_fuzzy_2 = valores_fuzzy_2[1]
+    fpc_fuzzy_2 = valores_fuzzy_2[2]
+
+    mediana_2 = []
+    desvio_padrao_2 = []
+    variancia_2 = []
+    media_2 = []
+    desvio_absoluto_2 = []
+
+    scatterploid = []
+    for id_2, sample_2 in test.groupby('scatterplotID'):
+        scatterploid.append(id_2)
+        mediana_2.append(sample_2.silhouette.median())
+        desvio_padrao_2.append(sample_2.silhouette.std())
+        variancia_2.append(sample_2.silhouette.var())
+        media_2.append(sample_2.silhouette.mean())
+        desvio_absoluto_2.append(sample_2.silhouette.mad())
+
+    x_2 = np.column_stack((erros_fuzzy_2, l_fuzzy_2, fpc_fuzzy_2, mediana_2, desvio_padrao_2, variancia_2, media_2, desvio_absoluto_2))
+
+    #usa o modelo criado anteriormente para prever o score das amostras de teste
+    #y_pred = model.predict(X_test)
+    y_pred = model.predict(x_2)
+
+    # calcula a taxa de correlação
+    # r_sq = model.score(x, y)
+    r_sq = model.score(X_train, y_train)
+    print('Taxa de correlação: ', r_sq)
+
+    # MSE Score perto de 0 é um bom modelo
+    print(f"MSE score: {mean_squared_error(y_test, y_pred)}")
+
+    # cria o csv de acordo com o modelo do kaggle
+    df = pd.DataFrame()
+    df['scatterplotID'] = scatterploid
+    df['score'] = y_pred
+    df.to_csv(dataset_path + 'submission.csv')
 
 if __name__ == "__main__":
     
