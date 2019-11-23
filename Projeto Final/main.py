@@ -80,6 +80,32 @@ def data_treat(dataset):
     dia_semana_embarque_list = [(datetime.strptime(dt_emb, '%Y-%m-%d').weekday()) for dt_emb in dataset[0]['DATAUTILIZACAO']]
     dataset[0]['DIASEMANA'] = dia_semana_embarque_list
 
+    # Dia Útil
+    # Não achei um jeito automático então por enquanto é colocar os feriados aqui :(
+    feriados = ['2018-09-07', '2018-10-12', '2018-11-15', '2018-11-02']
+    dia_util = []
+    for dia_semana, dt_emb in zip(dia_semana_embarque_list, dataset[0]['DATAUTILIZACAO']):
+        # Entre sábado e domingo ou em um dos feriados ñ é dia útil
+        if ((dia_semana >= 5 and dia_semana <= 6) or dt_emb in feriados):
+            dia_util.append(False)
+            print(str(dia_semana) + ' - ' + dt_emb)
+        else:
+            dia_util.append(True)
+    dataset[0]['DIA_UTIL'] = dia_util
+
+    # Faixa Etária
+    faixa_etaria = []
+    for idade in dataset[0]['IDADE']:
+        if idade > 0 and idade < 20:
+            faixa_etaria.append('JOVEM')
+        elif idade >= 20 and idade < 60:
+            faixa_etaria.append('ADULTO')
+        elif idade >= 60:
+            faixa_etaria.append('IDOSO')
+        else:
+            faixa_etaria.append('ERRO')
+    dataset[0]['FAIXAETARIA'] = faixa_etaria
+
     # Binarização da coluna Sexo
     sexoBinarizado = []
     for sexo in dataset['SEXO']:
@@ -104,6 +130,7 @@ def data_treat(dataset):
     cod_linha_binarizado = label_encoder.fit_transform(entradas['CODLINHA'])
     entradas['CODLINHABINARIZADO'] = cod_linha_binarizado
 
+    print(dataset[0])
     return dataset
 
 def data_map(dataset):
@@ -177,7 +204,7 @@ if __name__ == "__main__":
 
     # lê o dataset
     entradas = pd.read_csv(dataset_path + 'entradas.csv', encoding='utf-8')
-    
+
     plt.title('Regionais')
     plt.pie(entradas['REGIONAL'].value_counts(), labels=['Matriz', 'Boa Vista', 'St Felicidade', 'CIC', 'Fazendinha', 'Pinheirinho', 'Cajuru', 'Boqueirao', 'Tatu', 'Portao', 'Bairro Novo'],autopct='%1.1f%%')
     plt.show()
