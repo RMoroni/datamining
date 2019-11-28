@@ -2,11 +2,12 @@ import pandas as pd
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-#from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler
 #from sklearn.linear_model import LinearRegression
 #from sklearn.cluster import KMeans
 #from sklearn.metrics import mean_squared_error
-#from sklearn.neural_network import MLPRegressor
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import confusion_matrix
 #import skfuzzy as fuzz
 from sqlalchemy import create_engine
 from sklearn.model_selection import train_test_split
@@ -57,11 +58,16 @@ class NumberSelector(BaseEstimator, TransformerMixin):
         return X[[self.key]]
 
 def load_dataset(skiprows=0, nrows=None):
-    entrada = pd.read_csv(dataset_path + 'entrada_cartao.csv', skiprows=skiprows, nrows=nrows, encoding='latin-1', sep=';')
-    cartao = pd.read_csv(dataset_path + 'cartao.csv', skiprows=skiprows, nrows=nrows)
-    bairro = pd.read_csv(dataset_path + 'bairro.csv')
-    full_data = [entrada, cartao, bairro]
-    return full_data
+    return pd.read_csv(dataset_path + 'entradas.csv', skiprows=skiprows, nrows=nrows, encoding='latin-1')
+def data_map(dataset):
+    # Mapeia o valor de uma string para um int (rede neural só vai funfar assim...)
+    sexo_map = {'F':0, 'M':1}
+    regional = {'Santa Felicidade':0, 'Pinheirinho':1, 'Matriz':2, 'Fazendinha/Portao':3, 'Boa Vista':4, 'CIC':5, 'Boqueirao':6, 'Bairro Novo':7, 'Cajuru':8, 'Tatuquara':9}
+    dataset['REGIONAL'] = dataset['REGIONAL'].map(regional)
+    dataset['REGIONALDESTINO'] = dataset['REGIONALDESTINO'].map(regional)
+    dataset['SEXO'] = dataset['SEXO'].map(sexo_map)
+
+    return dataset
 
 def data_treat(dataset):
     # Tratamento das data de nascimento para idade
@@ -77,12 +83,12 @@ def data_treat(dataset):
     dataset.loc[(dataset['IDADE'] >= -50) & (dataset['IDADE'] < -40), 'IDADE'] = 64
 
     # Tratamento da data/hora de embarque para dias da semana ("Monday is 0 and Sunday is 6")
-    dia_semana_embarque_list = [(datetime.strptime(dt_emb, '%Y-%m-%d').weekday()) for dt_emb in dataset[0]['DATAUTILIZACAO']]
-    dataset[0]['DIASEMANA'] = dia_semana_embarque_list
+    dia_semana_embarque_list = [(datetime.strptime(dt_emb, '%Y-%m-%d').weekday()) for dt_emb in dataset['DATAUTILIZACAO']]
+    dataset['DIASEMANA'] = dia_semana_embarque_list
 
     # Dia Útil
     # Não achei um jeito automático então por enquanto é colocar os feriados aqui :(
-    feriados = ['2018-09-07', '2018-10-12', '2018-11-15', '2018-11-02']
+    '''feriados = ['2018-09-07', '2018-10-12', '2018-11-15', '2018-11-02']
     dia_util = []
     for dia_semana, dt_emb in zip(dia_semana_embarque_list, dataset[0]['DATAUTILIZACAO']):
         # Entre sábado e domingo ou em um dos feriados ñ é dia útil
@@ -92,20 +98,20 @@ def data_treat(dataset):
         else:
             dia_util.append(True)
     dataset[0]['DIA_UTIL'] = dia_util
-
+    '''
     # Faixa Etária
     faixa_etaria = []
-    for idade in dataset[0]['IDADE']:
+    for idade in dataset['IDADE']:
         if idade > 0 and idade < 20:
-            faixa_etaria.append('JOVEM')
+            faixa_etaria.append(0)
         elif idade >= 20 and idade < 60:
-            faixa_etaria.append('ADULTO')
+            faixa_etaria.append(1)
         elif idade >= 60:
-            faixa_etaria.append('IDOSO')
+            faixa_etaria.append(2)
         else:
-            faixa_etaria.append('ERRO')
-    dataset[0]['FAIXAETARIA'] = faixa_etaria
-
+            faixa_etaria.append(3)
+    dataset['FAIXAETARIA'] = faixa_etaria
+    '''
     # Binarização da coluna Sexo
     sexoBinarizado = []
     for sexo in dataset['SEXO']:
@@ -130,15 +136,11 @@ def data_treat(dataset):
     cod_linha_binarizado = label_encoder.fit_transform(entradas['CODLINHA'])
     entradas['CODLINHABINARIZADO'] = cod_linha_binarizado
 
-    print(dataset[0])
-    return dataset
-
-def data_map(dataset):
-    #cluster_map = {'X':0, 'Y':1, 'XY':2, 'L':3}
-    #data['cluster'] = data['cluster'].map(cluster_map)
+    print(dataset[0])'''
     return dataset
 
 def show_plots(dataset):
+    '''
     entrada = dataset[0]
     cartao = dataset[1]
     bairros = dataset[2]
@@ -150,17 +152,43 @@ def show_plots(dataset):
 
     # Pie das origens
     plt.title('Bairros de Origem')
+    print(cartao['CODIGOBAIRROORIGEM'].value_counts().to_string())
     plt.pie(cartao['CODIGOBAIRROORIGEM'].value_counts(), autopct='%1.1f%%')
     plt.show()
 
     # Pie dos destino
     plt.title('Bairros de Destino')
+    print(cartao['CODIGOBAIRRODESTINO'].value_counts().to_string())
     plt.pie(cartao['CODIGOBAIRRODESTINO'].value_counts(), autopct='%1.1f%%')
+    plt.show()
+    '''
+
+    plt.rcParams.update({'font.size':18})
+    plt.title('Regional de Destino')
+    plt.bar(['Matriz', 'Santa Felicidade', 'Boa Vista', 'CIC', 'Fazendinha', 'Pinheirinho', 'Cajururu', 'Boqueirão', 'Tatuquara', 'Bairro Novo'], dataset['REGIONALDESTINO'].value_counts())
+    plt.show()
+
+    plt.title('Regional de Origem')
+    plt.bar(['Matriz', 'Santa Felicidade', 'Boa Vista', 'Fazendinha/Portão', 'CIC', 'Pinheirinho', 'Cajururu', 'Boqueirão', 'Bairro Novo', 'Tatuquara'], dataset['REGIONAL'].value_counts())
+    print(dataset['REGIONAL'].value_counts())
+    plt.show()
+
+    plt.title('Utilização por classe socioeconômica')
+    plt.bar(['7', '6', '5', '4'], dataset['CLASSE'].value_counts())
+    plt.show()
+
+    plt.title('Horário de utilização')
+    plt.bar(['7', '6', '17', '18', '8', '16', '15', '12', '19', '14', '9', '5', '13', '11', '10', '20', '21', '22', '23'], dataset['HORAUTILIZACAO'].value_counts())
+    plt.show()
+
+    plt.title('Utilização por faixa etária')
+    plt.bar(['Adulto', 'Idoso', 'Jovem'], dataset['FAIXAETARIA'].value_counts())
     plt.show()
 
     # Uso de acordo com sexo
     plt.title('Utilização por sexo')
-    plt.pie(entrada['SEXO'].value_counts(), labels=['F', 'M'], autopct='%1.1f%%')
+    print(dataset['SEXO'].value_counts())
+    plt.pie(dataset['SEXO'].value_counts(), labels=['F', 'M'], autopct='%1.1f%%')
     plt.show()
 
 def criaDadosCsv():
@@ -190,15 +218,53 @@ def criaDadosCsv():
 
     return entradas
 
+def mlp_simples(dataset):
+    # Algum desses deu problema, por isso essa gambiarra aqui
+    dataset['SEXO'].fillna(0, inplace=True)
+    dataset['DIASEMANA'].fillna(0, inplace=True)
+
+    # Separa dados de treino e teste (mais ou menos 10% pra teste)
+    train = dataset[0:648963]
+    test = dataset[648963:720963]
+
+    # Retira as colunas que ñ serão utilizadas no treino e a coluna de regional de destino (tira o gabarito)
+    train.drop(columns=['REGIONALDESTINO', 'NUMEROCARTAO', 'INDEX', 'DATAUTILIZACAO', 'CODLINHA', 'BAIRRO', 'DATANASCIMENTO', 'FAIXAETARIA'], inplace=True)
+    test.drop(columns=['REGIONALDESTINO', 'NUMEROCARTAO', 'INDEX', 'DATAUTILIZACAO', 'CODLINHA', 'BAIRRO', 'DATANASCIMENTO', 'FAIXAETARIA'], inplace=True)
+
+    # Nesse formato pra funfar
+    X = train.values #dados para treino
+    Y = dataset[0:648963]['REGIONALDESTINO'].values
+    y_test = dataset[648963:720963]['REGIONALDESTINO'].values
+    X = np.array(X)
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X) # Isso melhora um pouco...
+    #scaler.fit(X)
+    #X = scaler.transform(X)
+
+    # Cria o classificador e treina
+    mlp = MLPClassifier(hidden_layer_sizes=(150,100,100,100,50), max_iter=200, verbose=True)
+    mlp.fit(X, Y)
+
+    # Faz predição e gera matriz de confusão
+    test_pred = mlp.predict(test)
+    cm = confusion_matrix(test_pred, y_test)
+    print(cm)
+
+    # Gera score para o test (score é a média da acurácia)
+    print(mlp.score(test, y_test))
+
 if __name__ == "__main__":
     print('Carregando os dados...')
     dataset = load_dataset()
     print('Tratamento dos dados...')
     dataset = data_treat(dataset)
+    print('Mapeamento dos dados...')
+    dataset = data_map(dataset)
     #print('Plotagem...')
     #show_plots(dataset)
-    exit(0)
+    mlp_simples(dataset)
 
+    exit(0)
     # entradas = alimentaDataframe()
     # print(entradas.head())
 
